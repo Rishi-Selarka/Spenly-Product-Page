@@ -1,21 +1,17 @@
-import React from 'react'
-import Header from './components/Header'
-import Hero from './components/Hero'
-import Features from './components/Features'
-import FAQ from './components/FAQ'
-import Footer from './components/Footer'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import Home from './pages/Home'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
 
 function App(): JSX.Element {
   return (
-    <>
-      <Header />
-      <main>
-        <Hero />
-        <Features />
-        <FAQ />
-      </main>
-      <Footer />
-    </>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+      </Routes>
+    </Router>
   )
 }
 

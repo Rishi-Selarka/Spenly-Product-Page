@@ -42,6 +42,29 @@ const Card = styled(motion.article)`
   overflow: hidden;
   cursor: pointer;
 
+  &::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, 
+      rgba(59, 130, 246, 0.3) 0%, 
+      rgba(147, 51, 234, 0.2) 50%, 
+      rgba(59, 130, 246, 0.3) 100%
+    );
+    border-radius: 10px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+    filter: blur(8px);
+  }
+
+  &:hover::before {
+    opacity: 1;
+  }
+
   &:focus-visible {
     outline: 2px solid rgba(255, 255, 255, 0.3);
     outline-offset: 2px;
