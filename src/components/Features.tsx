@@ -1,11 +1,74 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import './Features.css'
+import styled from 'styled-components'
 
 interface Feature {
   title: string
   description: string
 }
+
+const FeaturesSection = styled.section`
+  padding: 120px 0 80px;
+  position: relative;
+  z-index: 1;
+  background: #000000;
+
+  @media (max-width: 768px) {
+    padding: 80px 0 60px;
+  }
+`
+
+const FeatureGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+  position: relative;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+`
+
+const Card = styled(motion.article)`
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.3);
+    outline-offset: 2px;
+  }
+
+  h3 {
+    margin: 0 0 12px;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    position: relative;
+    z-index: 1;
+  }
+
+  p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.6;
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-width: 768px) {
+    padding: 24px;
+  }
+`
 
 const Features: React.FC = () => {
   const features: Feature[] = [
@@ -48,25 +111,24 @@ const Features: React.FC = () => {
   ]
 
   return (
-    <section className="features" id="features">
+    <FeaturesSection id="features">
       <div className="container">
         <div className="section-head">
           <h2>Why Spenly?</h2>
           <p>Transform your financial life with features designed for modern personal finance.</p>
         </div>
-        <div className="feature-grid">
+        <FeatureGrid>
           {features.map((feature, index) => (
-            <motion.article
+            <Card
               key={index}
-              className="card"
               initial={{ opacity: 0, x: -100 }}
-              whileInView={{ 
-                opacity: 1, 
+              whileInView={{
+                opacity: 1,
                 x: 0
               }}
               whileTap={{ scale: 0.8 }}
               viewport={{ once: true, margin: "-100px" }}
-              transition={{ 
+              transition={{
                 duration: 0.9,
                 easing: [0.17, 0.55, 0.55, 1],
                 delay: index * 0.1,
@@ -78,13 +140,12 @@ const Features: React.FC = () => {
             >
               <h3>{feature.title}</h3>
               <p className="card-description">{feature.description}</p>
-            </motion.article>
+            </Card>
           ))}
-        </div>
+        </FeatureGrid>
       </div>
-    </section>
+    </FeaturesSection>
   )
 }
 
 export default Features
-

@@ -1,12 +1,119 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import './FAQ.css'
+import styled from 'styled-components'
 
 interface FAQItem {
   id: string
   question: string
   answer: string
 }
+
+const FAQSection = styled.section`
+  padding: 80px 0 100px;
+  position: relative;
+  z-index: 1;
+  background: #000000;
+
+  @media (max-width: 768px) {
+    padding: 60px 0 80px;
+  }
+`
+
+const FAQContainer = styled.div`
+  max-width: 800px;
+  margin: 0 auto;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  box-shadow: 0 1px 1px hsl(0deg 0% 0% / 0.075), 0 2px 2px hsl(0deg 0% 0% / 0.075), 0 4px 4px hsl(0deg 0% 0% / 0.075), 0 8px 8px hsl(0deg 0% 0% / 0.075), 0 16px 16px hsl(0deg 0% 0% / 0.075);
+  display: flex;
+  flex-direction: column;
+
+  @media (max-width: 768px) {
+    margin: 0 20px;
+  }
+`
+
+const FAQNav = styled.nav`
+  background: rgba(0, 0, 0, 0.8);
+  padding: 5px 5px 0;
+  border-radius: 10px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 44px;
+`
+
+const FAQTabsContainer = styled.ul`
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+`
+
+const FAQTab = styled(motion.li)`
+  list-style: none;
+  padding: 10px 15px;
+  position: relative;
+  background: transparent;
+  cursor: pointer;
+  min-height: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  user-select: none;
+  color: var(--text);
+  font-family: 'Poppins', sans-serif;
+  transition: background-color 0.2s ease;
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+`
+
+const FAQUnderline = styled(motion.div)`
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand);
+`
+
+const FAQContentContainer = styled.main`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  padding: 40px;
+  min-height: 200px;
+
+  @media (max-width: 768px) {
+    padding: 30px 20px;
+    min-height: 150px;
+  }
+`
+
+const FAQAnswer = styled(motion.div)`
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+  font-family: 'Inter', sans-serif;
+  text-align: left;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    font-size: 14px;
+  }
+`
 
 const faqs: FAQItem[] = [
   {
@@ -45,55 +152,51 @@ const FAQ: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<FAQItem>(faqs[0])
 
   return (
-    <section className="faq" id="faq">
+    <FAQSection id="faq">
       <div className="container">
         <div className="section-head">
           <h2>Frequently asked</h2>
         </div>
-        <div className="faq-container">
-          <nav className="faq-nav">
-            <ul className="faq-tabs-container">
+        <FAQContainer>
+          <FAQNav>
+            <FAQTabsContainer>
               {faqs.map((faq) => (
-                <motion.li
+                <FAQTab
                   key={faq.id}
                   initial={false}
                   animate={{
                     backgroundColor: faq === selectedTab ? "rgba(255, 255, 255, 0.05)" : "transparent",
                   }}
-                  className="faq-tab"
                   onClick={() => setSelectedTab(faq)}
                 >
                   {faq.question}
                   {faq === selectedTab ? (
-                    <motion.div
-                      className="faq-underline"
+                    <FAQUnderline
                       layoutId="underline"
                       id="underline"
                     />
                   ) : null}
-                </motion.li>
+                </FAQTab>
               ))}
-            </ul>
-          </nav>
-          <main className="faq-content-container">
+            </FAQTabsContainer>
+          </FAQNav>
+          <FAQContentContainer>
             <AnimatePresence mode="wait">
-              <motion.div
+              <FAQAnswer
                 key={selectedTab ? selectedTab.id : "empty"}
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -10, opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="faq-answer"
               >
                 {selectedTab ? selectedTab.answer : ""}
-              </motion.div>
+              </FAQAnswer>
             </AnimatePresence>
-          </main>
-        </div>
+          </FAQContentContainer>
+        </FAQContainer>
       </div>
-    </section>
+    </FAQSection>
   )
 }
 
 export default FAQ
-
