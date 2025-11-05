@@ -36,6 +36,17 @@ const HeroBgImage = styled.img`
   top: 58%;
   left: 50%;
   transform: translate(-50%, -50%);
+
+  @media (max-width: 768px) {
+    width: 160%;
+    height: auto;
+    top: 55%;
+  }
+
+  @media (max-width: 480px) {
+    width: 180%;
+    top: 58%;
+  }
 `
 
 const HeroBgOverlay = styled.div`
