@@ -5,7 +5,7 @@ import Features from './components/Features'
 import FAQ from './components/FAQ'
 import Footer from './components/Footer'
 
-function App() {
+function App(): JSX.Element {
   return (
     <>
       <Header />
@@ -20,5 +20,4 @@ function App() {
 }
 
 export default App
-
 

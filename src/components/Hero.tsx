@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import mockImage from '../assets/mock111.jpg'
 import './Hero.css'
 
-const Hero = () => {
+const Hero: React.FC = () => {
   return (
     <section className="hero" id="get-started">
       <div className="hero-bg">
@@ -60,3 +60,4 @@ const Hero = () => {
 }
 
 export default Hero
+

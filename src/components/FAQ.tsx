@@ -2,7 +2,13 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import './FAQ.css'
 
-const faqs = [
+interface FAQItem {
+  id: string
+  question: string
+  answer: string
+}
+
+const faqs: FAQItem[] = [
   {
     id: 'premium',
     question: 'What is Spenly Premium?',
@@ -35,8 +41,8 @@ const faqs = [
   }
 ]
 
-const FAQ = () => {
-  const [selectedTab, setSelectedTab] = useState(faqs[0])
+const FAQ: React.FC = () => {
+  const [selectedTab, setSelectedTab] = useState<FAQItem>(faqs[0])
 
   return (
     <section className="faq" id="faq">

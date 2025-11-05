@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import mockImage from '../assets/mock111.jpg'
 import './Preview.css'
 
-const Preview = () => {
+const Preview: React.FC = () => {
   return (
     <section className="preview" id="preview">
       <div className="container">

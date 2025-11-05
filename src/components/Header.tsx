@@ -2,7 +2,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import './Header.css'
 
-const Header = () => {
+const Header: React.FC = () => {
   return (
     <header className="site-header">
       <div className="container header-inner">

@@ -2,8 +2,13 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import './Features.css'
 
-const Features = () => {
-  const features = [
+interface Feature {
+  title: string
+  description: string
+}
+
+const Features: React.FC = () => {
+  const features: Feature[] = [
     {
       title: 'Real-time Tracking',
       description: 'Add expenses/income in a tap with smart categories. Track spending in seconds and see exactly where your money goes.'
