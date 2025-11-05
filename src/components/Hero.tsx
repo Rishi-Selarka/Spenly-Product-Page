@@ -155,7 +155,7 @@ const Hero: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
           >
-            Fast, intuitive expense tracker built for modern personal finance. Track spending, stay on budget, and see exactly where your money goes.
+            AI powered Money Manager & Budget Tracker<br />with personalised finance
           </HeroSub>
           <HeroCta
             initial={{ opacity: 0, y: 20 }}

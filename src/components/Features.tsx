@@ -39,30 +39,13 @@ const Card = styled(motion.article)`
   border-radius: 10px;
   padding: 32px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
+  transition: all 0.3s ease;
 
-  &::before {
-    content: '';
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(135deg, 
-      rgba(59, 130, 246, 0.3) 0%, 
-      rgba(147, 51, 234, 0.2) 50%, 
-      rgba(59, 130, 246, 0.3) 100%
-    );
-    border-radius: 10px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: -1;
-    filter: blur(8px);
-  }
-
-  &:hover::before {
-    opacity: 1;
+  &:hover {
+    box-shadow: 0 0 30px rgba(37, 99, 235, 0.6), 0 0 60px rgba(37, 99, 235, 0.3);
+    transform: scale(1.05);
   }
 
   &:focus-visible {
@@ -142,25 +125,7 @@ const Features: React.FC = () => {
         </div>
         <FeatureGrid>
           {features.map((feature, index) => (
-            <Card
-              key={index}
-              initial={{ opacity: 0, x: -100 }}
-              whileInView={{
-                opacity: 1,
-                x: 0
-              }}
-              whileTap={{ scale: 0.8 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{
-                duration: 0.9,
-                easing: [0.17, 0.55, 0.55, 1],
-                delay: index * 0.1,
-                scale: {
-                  type: "spring",
-                  stiffness: 1000
-                }
-              }}
-            >
+            <Card key={index}>
               <h3>{feature.title}</h3>
               <p className="card-description">{feature.description}</p>
             </Card>
