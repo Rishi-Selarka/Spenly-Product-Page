@@ -31,7 +31,6 @@ const HeroBgImage = styled.img`
   object-fit: contain;
   object-position: center center;
   filter: blur(0.5px) brightness(1);
-  will-change: transform;
   position: absolute;
   top: 58%;
   left: 50%;

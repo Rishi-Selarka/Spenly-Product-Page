@@ -15,7 +15,8 @@ const TestimonialsSection = styled.section`
   position: relative;
   z-index: 1;
   background: #000000;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
 
   @media (max-width: 768px) {
     padding: 60px 0;
@@ -53,8 +54,9 @@ const scroll = keyframes`
 
 const CarouselWrapper = styled.div`
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
+  padding: 20px 0;
   
   &::before,
   &::after {
@@ -83,7 +85,6 @@ const CarouselTrack = styled.div`
   gap: 24px;
   animation: ${scroll} 60s linear infinite;
   width: fit-content;
-  will-change: transform;
 
   &:hover {
     animation-play-state: paused;
@@ -99,13 +100,12 @@ const ReviewCard = styled.div`
   padding: 24px;
   width: 340px;
   flex-shrink: 0;
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease;
   box-shadow: 
     0 8px 32px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
-  will-change: transform;
 
   &::before {
     content: '';
@@ -123,6 +123,8 @@ const ReviewCard = styled.div`
 
   &:hover {
     background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-4px);
+  }
     border-color: rgba(255, 255, 255, 0.25);
     transform: translateY(-6px);
     box-shadow: 

@@ -5,6 +5,7 @@ import styled from 'styled-components'
 interface Feature {
   title: string
   description: string
+  icon: string
 }
 
 const FeaturesSection = styled.section`
@@ -41,7 +42,7 @@ const Card = styled(motion.article)`
   position: relative;
   overflow: visible;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 
   &:hover {
     box-shadow: 0 0 30px rgba(37, 99, 235, 0.6), 0 0 60px rgba(37, 99, 235, 0.3);
@@ -53,64 +54,79 @@ const Card = styled(motion.article)`
     outline-offset: 2px;
   }
 
-  h3 {
-    margin: 0 0 12px;
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text);
-    position: relative;
-    z-index: 1;
-  }
-
-  p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 15px;
-    line-height: 1.6;
-    position: relative;
-    z-index: 1;
-  }
-
   @media (max-width: 768px) {
     padding: 24px;
   }
 `
 
+const FeatureIcon = styled.div`
+  font-size: 36px;
+  margin-bottom: 16px;
+  line-height: 1;
+`
+
+const FeatureTitle = styled.h3`
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  position: relative;
+  z-index: 1;
+`
+
+const FeatureDescription = styled.p`
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+`
+
 const Features: React.FC = () => {
   const features: Feature[] = [
     {
+      icon: '⚡',
       title: 'Real-time Tracking',
       description: 'Add expenses/income in a tap with smart categories. Track spending in seconds and see exactly where your money goes.'
     },
     {
+      icon: '🎯',
       title: 'Smart Budgeting',
       description: 'Set budgets and monitor progress with helpful alerts. Stay on budget effortlessly with automated tracking.'
     },
     {
+      icon: '📊',
       title: 'Analytics & Insights',
       description: 'Clean analytics reveal patterns, top categories, and monthly insights. Know your trends at a glance.'
     },
     {
+      icon: '💱',
       title: 'Multi-Currency',
       description: '150+ currencies with live exchange rates. Perfect for travelers and expats managing finances globally.'
     },
     {
+      icon: '☁️',
       title: 'iCloud Sync',
       description: 'Always in sync across devices. Your data stays up to date wherever you access Spenly.'
     },
     {
+      icon: '📸',
       title: 'Receipt Organization',
       description: 'Attach receipt photos to any transaction. Keep your receipts organized and accessible.'
     },
     {
+      icon: '📄',
       title: 'Export Reports',
       description: 'Generate professional PDF or CSV reports anytime. Export your financial data for analysis or records.'
     },
     {
+      icon: '🔒',
       title: 'Privacy First',
       description: 'Local Core Data storage with optional iCloud sync. Your data stays yours, encrypted by Apple.'
     },
     {
+      icon: '🤖',
       title: 'AI-Powered Insights',
       description: 'Get smart financial insights and chat assistance with Spenly AI. Ask questions about your spending, receive personalized recommendations, and get intelligent analysis of your financial patterns.'
     }
@@ -126,8 +142,9 @@ const Features: React.FC = () => {
         <FeatureGrid>
           {features.map((feature, index) => (
             <Card key={index}>
-              <h3>{feature.title}</h3>
-              <p className="card-description">{feature.description}</p>
+              <FeatureIcon>{feature.icon}</FeatureIcon>
+              <FeatureTitle>{feature.title}</FeatureTitle>
+              <FeatureDescription>{feature.description}</FeatureDescription>
             </Card>
           ))}
         </FeatureGrid>

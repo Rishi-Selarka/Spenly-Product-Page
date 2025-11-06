@@ -39,29 +39,31 @@ const FAQItem = styled(motion.div)`
   box-shadow: 0 1px 1px hsl(0deg 0% 0% / 0.075), 0 2px 2px hsl(0deg 0% 0% / 0.075), 0 4px 4px hsl(0deg 0% 0% / 0.075);
 `
 
-const FAQQuestion = styled.button`
+const Question = styled.button<{ isOpen: boolean }>`
   width: 100%;
-  padding: 20px 24px;
-  background: transparent;
-  border: none;
+  padding: 24px 28px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background 0.3s ease, border-color 0.3s ease;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  cursor: pointer;
-  text-align: left;
-  color: var(--text);
-  font-family: 'Poppins', sans-serif;
-  font-size: 16px;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
+  gap: 20px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
   }
 
   @media (max-width: 768px) {
-    font-size: 15px;
-    padding: 16px 20px;
+    font-size: 16px;
+    padding: 20px 24px;
   }
 `
 
@@ -146,7 +148,7 @@ const FAQ: React.FC = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.4 }}
             >
-              <FAQQuestion onClick={() => toggleFAQ(faq.id)}>
+              <Question isOpen={openId === faq.id} onClick={() => toggleFAQ(faq.id)}>
                 {faq.question}
                 <PlusIcon
                   animate={{ rotate: openId === faq.id ? 45 : 0 }}
@@ -154,7 +156,7 @@ const FAQ: React.FC = () => {
                 >
                   +
                 </PlusIcon>
-              </FAQQuestion>
+              </Question>
               <AnimatePresence>
                 {openId === faq.id && (
                   <FAQAnswer

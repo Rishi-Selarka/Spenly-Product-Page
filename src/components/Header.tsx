@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import styled from 'styled-components'
+import spenlyLogo from '../assets/SpenlyLogo14.png'
 
 const StyledHeader = styled.header`
   position: fixed;
@@ -30,6 +31,13 @@ const Brand = styled(motion.div)`
   gap: 12px;
 `
 
+const Logo = styled.img`
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
+`
+
 const LogoText = styled.div`
   font-family: 'Playfair Display', serif;
   font-size: 28px;
@@ -53,6 +61,7 @@ const Header: React.FC = () => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
         >
+          <Logo src={spenlyLogo} alt="Spenly Logo" />
           <LogoText>SPENLY</LogoText>
         </Brand>
       </HeaderInner>

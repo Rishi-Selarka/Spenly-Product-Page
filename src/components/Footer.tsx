@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 
 const StyledFooter = styled.footer`
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 32px 0;
+  padding: 32px 0 24px;
   color: var(--muted);
   background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(20px);
@@ -12,13 +12,17 @@ const StyledFooter = styled.footer`
   z-index: 1;
 `
 
+const FooterContent = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+`
+
 const FooterInner = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  margin-bottom: 20px;
 
   @media (max-width: 640px) {
     flex-direction: column;
@@ -55,22 +59,46 @@ const LegalLink = styled(Link)`
   }
 `
 
+const FooterBottom = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+
+  @media (max-width: 640px) {
+    text-align: center;
+  }
+`
+
+const MadeWithLove = styled.span`
+  color: var(--muted);
+  opacity: 0.6;
+  font-family: 'Inter', sans-serif;
+`
+
 const Footer: React.FC = () => {
   const currentYear: number = new Date().getFullYear()
 
   return (
     <StyledFooter>
-      <FooterInner>
-        <span>© {currentYear} SPENLY. All rights reserved.</span>
-        <LegalLinks>
-          <LegalLink to="/privacy">
-            Privacy Policy
-          </LegalLink>
-          <LegalLink to="/terms">
-            Terms of Service
-          </LegalLink>
-        </LegalLinks>
-      </FooterInner>
+      <FooterContent>
+        <FooterInner>
+          <span>© {currentYear} SPENLY. All rights reserved.</span>
+          <LegalLinks>
+            <LegalLink to="/privacy">
+              Privacy Policy
+            </LegalLink>
+            <LegalLink to="/terms">
+              Terms of Service
+            </LegalLink>
+          </LegalLinks>
+        </FooterInner>
+        <FooterBottom>
+          <MadeWithLove>Made with ❤️ by Rishi Selarka</MadeWithLove>
+        </FooterBottom>
+      </FooterContent>
     </StyledFooter>
   )
 }
