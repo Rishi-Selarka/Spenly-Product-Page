@@ -501,10 +501,10 @@ const Pricing: React.FC = () => {
                 <>
                   <Price>
                     <span className="currency">$</span>
-                    <span className="amount">100</span>
+                    <span className="amount">9.99</span>
                     <span className="period">/lifetime</span>
                   </Price>
-                  <PriceNote>₹1000 • One-time payment, lifetime access</PriceNote>
+                  <PriceNote>₹999 • One-time payment, lifetime access</PriceNote>
                 </>
               )}
             </PriceContainer>
