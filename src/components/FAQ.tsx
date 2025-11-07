@@ -86,6 +86,7 @@ const FAQAnswer = styled(motion.div)`
   font-family: 'Inter', sans-serif;
   padding: 0 24px 20px;
   overflow: hidden;
+  will-change: height, opacity;
 
   @media (max-width: 768px) {
     font-size: 14px;
@@ -152,18 +153,25 @@ const FAQ: React.FC = () => {
                 {faq.question}
                 <PlusIcon
                   animate={{ rotate: openId === faq.id ? 45 : 0 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ 
+                    duration: 0.2,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
                 >
                   +
                 </PlusIcon>
               </Question>
-              <AnimatePresence>
+              <AnimatePresence mode="wait">
                 {openId === faq.id && (
                   <FAQAnswer
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    transition={{ 
+                      duration: 0.25,
+                      ease: [0.4, 0.0, 0.2, 1],
+                      opacity: { duration: 0.15 }
+                    }}
                   >
                     {faq.answer}
                   </FAQAnswer>
