@@ -81,25 +81,6 @@ const SocialIcons = styled.div`
   align-items: center;
 `
 
-const FooterBottom = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  font-size: 13px;
-
-  @media (max-width: 640px) {
-    text-align: center;
-  }
-`
-
-const MadeWithLove = styled.span`
-  color: var(--muted);
-  opacity: 0.6;
-  font-family: 'Inter', sans-serif;
-`
-
 const Footer: React.FC = () => {
   const currentYear: number = new Date().getFullYear()
 
@@ -139,9 +120,6 @@ const Footer: React.FC = () => {
             </SocialIcons>
           </LegalLinks>
         </FooterInner>
-        <FooterBottom>
-          <MadeWithLove>Made with ❤️ by Rishi Selarka</MadeWithLove>
-        </FooterBottom>
       </FooterContent>
     </StyledFooter>
   )
