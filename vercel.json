@@ -1,5 +1,22 @@
 {
+  "functions": {
+    "api/**/*.go": {
+      "runtime": "go1.x"
+    }
+  },
   "rewrites": [
+    {
+      "source": "/api/whatsapp/webhook",
+      "destination": "/api/whatsapp/webhook"
+    },
+    {
+      "source": "/api/whatsapp/link-token",
+      "destination": "/api/whatsapp/link-token"
+    },
+    {
+      "source": "/api/whatsapp/transactions",
+      "destination": "/api/whatsapp/transactions"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
