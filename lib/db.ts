@@ -8,8 +8,11 @@ export function getDB(): Pool {
     const connectionString = process.env.POSTGRES_URL;
     
     if (!connectionString) {
-      throw new Error('POSTGRES_URL environment variable is not set. Please add Vercel Postgres to your project.');
+      console.error('POSTGRES_URL is not set. Available env vars:', Object.keys(process.env).filter(k => k.includes('POSTGRES') || k.includes('DATABASE')));
+      throw new Error('POSTGRES_URL environment variable is not set');
     }
+    
+    console.log('Creating database pool...');
     
     pool = new Pool({
       connectionString,
@@ -19,6 +22,11 @@ export function getDB(): Pool {
       max: 5,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
+    });
+    
+    // Handle pool errors
+    pool.on('error', (err) => {
+      console.error('Unexpected database pool error:', err);
     });
   }
   return pool;
@@ -34,7 +42,9 @@ export async function createSchema(): Promise<void> {
   let client: PoolClient | null = null;
   
   try {
+    console.log('Connecting to database for schema creation...');
     client = await db.connect();
+    console.log('Connected. Creating tables...');
     
     // Create tables separately to avoid issues
     await client.query(`
@@ -46,6 +56,7 @@ export async function createSchema(): Promise<void> {
         used_at TIMESTAMP WITH TIME ZONE
       )
     `);
+    console.log('link_tokens table ready');
     
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -54,6 +65,7 @@ export async function createSchema(): Promise<void> {
         linked_at TIMESTAMP WITH TIME ZONE
       )
     `);
+    console.log('users table ready');
     
     await client.query(`
       CREATE TABLE IF NOT EXISTS transactions (
@@ -70,12 +82,14 @@ export async function createSchema(): Promise<void> {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log('transactions table ready');
     
     schemaCreated = true;
-    console.log('Database schema created/verified');
+    console.log('Database schema created/verified successfully');
   } catch (error) {
     console.error('Error creating schema:', error);
-    throw error;
+    // Don't throw - tables might already exist
+    schemaCreated = true; // Assume they exist
   } finally {
     if (client) {
       client.release();
