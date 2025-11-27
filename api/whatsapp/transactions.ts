@@ -1,17 +1,27 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDB } from '../../lib/db.js';
+import { getDB, createSchema } from '../../lib/db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const db = getDB();
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
-  if (req.method === 'GET') {
-    const { apple_user_id } = req.query;
-    
-    if (!apple_user_id) {
-      return res.status(400).json({ error: 'apple_user_id is required' });
-    }
+  try {
+    await createSchema();
+    const db = getDB();
 
-    try {
+    if (req.method === 'GET') {
+      const apple_user_id = req.query.apple_user_id as string;
+      
+      if (!apple_user_id) {
+        return res.status(400).json({ error: 'apple_user_id is required' });
+      }
+
       const result = await db.query(
         `SELECT id, apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status, created_at
          FROM transactions
@@ -20,39 +30,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         [apple_user_id]
       );
       
-      // Format dates for JSON
       const transactions = result.rows.map(row => ({
         ...row,
-        date: new Date(row.transaction_date).toISOString().split('T')[0] // YYYY-MM-DD
+        date: row.transaction_date ? new Date(row.transaction_date).toISOString().split('T')[0] : null
       }));
 
       return res.status(200).json(transactions);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  } 
-  
-  else if (req.method === 'POST') {
-    const { transaction_ids } = req.body;
+    } 
+    
+    else if (req.method === 'POST') {
+      const { transaction_ids } = req.body || {};
 
-    if (!transaction_ids || !Array.isArray(transaction_ids) || transaction_ids.length === 0) {
-      return res.status(400).json({ error: 'transaction_ids array is required' });
-    }
+      if (!transaction_ids || !Array.isArray(transaction_ids) || transaction_ids.length === 0) {
+        return res.status(400).json({ error: 'transaction_ids array is required' });
+      }
 
-    try {
       await db.query(
-        `UPDATE transactions SET status = 'synced' WHERE id = ANY($1)`,
+        `UPDATE transactions SET status = 'synced' WHERE id = ANY($1::int[])`,
         [transaction_ids]
       );
       
       return res.status(200).json({ message: 'Transactions synced successfully' });
-    } catch (error) {
-      console.error('Error syncing transactions:', error);
-      return res.status(500).json({ error: 'Internal server error' });
     }
+
+    return res.status(405).json({ error: 'Method not allowed' });
+    
+  } catch (error: any) {
+    console.error('Error in transactions:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
-
-  return res.status(405).json({ error: 'Method not allowed' });
 }
-
