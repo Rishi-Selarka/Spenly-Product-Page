@@ -36,9 +36,10 @@ async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
   const fromAddr = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
 
   try {
-    await client.messages.create({ body, from: fromAddr, to: toAddr });
+    const message = await client.messages.create({ body, from: fromAddr, to: toAddr });
+    console.log(`✅ Message sent to ${to}: ${message.sid}`);
   } catch (error) {
-    console.error('Error sending WhatsApp:', error);
+    console.error('❌ Error sending WhatsApp:', error);
   }
 }
 
@@ -46,6 +47,7 @@ async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
 function parseTransaction(text: string) {
   const result = { amount: 0, vendor: 'Expense', note: text || 'Expense' };
   
+  // Extract amount - matches $10, 10.50, $10.50, etc.
   const match = text.match(/\$?(\d+(?:\.\d{1,2})?)/);
   if (match) {
     result.amount = parseFloat(match[1]);
@@ -71,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const messageType = (NumMedia && parseInt(NumMedia) > 0) ? 'image' : 'text';
     const mediaUrl = messageType === 'image' ? MediaUrl0 : null;
 
-    console.log(`Message from ${From}: ${Body}`);
+    console.log(`📨 Webhook received from ${From}: "${Body}" (type: ${messageType})`);
 
     const db = getDB();
     const lowerBody = Body.trim().toLowerCase();
@@ -79,6 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle linking
     if (lowerBody.startsWith('link_')) {
       const token = lowerBody.replace('link_', '');
+      console.log(`🔗 Processing link token: ${token}`);
       
       const tokenResult = await db.query(
         `SELECT apple_user_id, expires_at, used_at FROM link_tokens WHERE token = $1`,
@@ -86,11 +89,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
 
       if (tokenResult.rows.length === 0) {
+        console.log(`❌ Invalid token: ${token}`);
         await sendWhatsAppMessage(From, "❌ Invalid linking code.");
       } else {
         const { apple_user_id, expires_at, used_at } = tokenResult.rows[0];
         
         if (used_at || new Date() > new Date(expires_at)) {
+          console.log(`❌ Token expired or used`);
           await sendWhatsAppMessage(From, "❌ Code expired or already used.");
         } else {
           await db.query(`UPDATE link_tokens SET used_at = NOW() WHERE token = $1`, [token]);
@@ -99,6 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
              ON CONFLICT (apple_user_id) DO UPDATE SET whatsapp_number = $2, linked_at = NOW()`,
             [apple_user_id, From]
           );
+          console.log(`✅ Linked ${From} to ${apple_user_id}`);
           await sendWhatsAppMessage(From, "✅ Account linked! Send expenses like 'Coffee $5'");
         }
       }
@@ -110,16 +116,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
 
       if (userResult.rows.length === 0) {
+        console.log(`❌ User ${From} not linked`);
         await sendWhatsAppMessage(From, "Please link your account first via Spenly app → Settings → Connect WhatsApp Bot");
       } else {
         const appleUserID = userResult.rows[0].apple_user_id;
         const parsed = parseTransaction(Body);
         
+        console.log(`💾 Saving transaction for ${appleUserID}: ${parsed.vendor} $${parsed.amount}`);
+        
+        // Use CURRENT_DATE for DATE column
         await db.query(
           `INSERT INTO transactions (apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status)
-           VALUES ($1, $2, NOW(), $3, 'Uncategorized', $4, $5, $6, 'pending_sync')`,
+           VALUES ($1, $2, CURRENT_DATE, $3, 'Uncategorized', $4, $5, $6, 'pending_sync')`,
           [appleUserID, parsed.amount, parsed.vendor, parsed.note, messageType, mediaUrl]
         );
+        
+        console.log(`✅ Transaction saved successfully`);
         
         const amountStr = parsed.amount > 0 ? ` $${parsed.amount.toFixed(2)}` : '';
         await sendWhatsAppMessage(From, `✅ Added: ${parsed.vendor}${amountStr}`);
@@ -130,7 +142,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send('<Response></Response>');
 
   } catch (error: any) {
-    console.error('Webhook error:', error);
+    console.error('❌ Webhook error:', error);
+    console.error('Error stack:', error.stack);
     res.setHeader('Content-Type', 'text/xml');
     return res.status(200).send('<Response></Response>');
   }
