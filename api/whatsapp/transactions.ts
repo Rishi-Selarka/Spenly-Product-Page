@@ -47,9 +47,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           [apple_user_id]
         );
         
+        // Convert NUMERIC to number (PostgreSQL returns NUMERIC as string)
         const transactions = result.rows.map(row => ({
-          ...row,
-          date: row.transaction_date ? new Date(row.transaction_date).toISOString().split('T')[0] : null
+          id: row.id,
+          apple_user_id: row.apple_user_id,
+          amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount, // Convert string to number
+          date: row.transaction_date ? new Date(row.transaction_date).toISOString().split('T')[0] : null,
+          vendor: row.vendor,
+          category: row.category,
+          note: row.note,
+          message_type: row.message_type,
+          media_url: row.media_url,
+          status: row.status,
+          created_at: row.created_at
         }));
 
         return res.status(200).json(transactions);
