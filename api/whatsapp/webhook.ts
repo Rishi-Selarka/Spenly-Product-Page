@@ -368,9 +368,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   console.log('🚀 Webhook called at:', new Date().toISOString());
   console.log('Method:', req.method);
+  console.log('Content-Type:', req.headers['content-type']);
   console.log('Body type:', typeof req.body);
-  console.log('Body:', JSON.stringify(req.body, null, 2));
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Body keys:', req.body ? Object.keys(req.body) : 'no body');
+  console.log('Full body:', JSON.stringify(req.body, null, 2));
 
   if (req.method !== 'POST') {
     console.log('❌ Invalid method:', req.method);
@@ -379,15 +380,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Twilio sends form-urlencoded data
-    // Vercel should parse it automatically, but let's handle both cases
+    // Vercel automatically parses it, but let's handle both cases
     let params: any = {};
     
     if (typeof req.body === 'string') {
-      // Parse form-urlencoded manually if needed
+      // Manual parsing if needed
       const urlParams = new URLSearchParams(req.body);
       params = Object.fromEntries(urlParams);
+      console.log('📝 Parsed from string:', params);
     } else if (req.body && typeof req.body === 'object') {
       params = req.body;
+      console.log('📦 Using object body:', params);
+    } else {
+      console.error('❌ Unexpected body type:', typeof req.body);
+      return sendResponse();
     }
     
     const From = params.From || '';
@@ -395,10 +401,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const NumMedia = params.NumMedia || '0';
     const MediaUrl0 = params.MediaUrl0 || '';
     
-    console.log('📨 Parsed params:', { From, Body, NumMedia, MediaUrl0 });
+    console.log('📨 Extracted params:', { From, Body, NumMedia, MediaUrl0 });
     
     if (!From) {
-      console.error('❌ Missing From field');
+      console.error('❌ Missing From field. Available params:', Object.keys(params));
       return sendResponse();
     }
     
@@ -494,7 +500,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (lowerBody === 'help' || lowerBody === 'hi' || lowerBody === 'hello' || lowerBody === 'menu') {
-      console.log('📋 Showing menu');
+      console.log('📋 Showing menu for:', lowerBody);
       await sendInteractiveMenu(From, getWelcomeMessage());
       return sendResponse();
     }
@@ -562,7 +568,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Try to send error message if we have From
     try {
-      const From = req.body?.From || (typeof req.body === 'object' && req.body ? (req.body as any).From : '');
+      const params = req.body || {};
+      const From = params.From || '';
       if (From) {
         await sendWhatsAppMessage(From, "Sorry, I encountered an error. Please try again.");
       }
