@@ -217,7 +217,7 @@ function isInfoQuery(text: string): boolean {
     /week/i,
     /month/i,
     /year/i,
-    /?\s*$/
+    /\?\s*$/  // Ends with question mark (escaped ?)
   ];
   
   return questionPatterns.some(pattern => pattern.test(lower));
