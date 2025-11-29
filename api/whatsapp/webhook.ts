@@ -19,7 +19,7 @@ function getDB(): Pool {
   return pool;
 }
 
-async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
+async function sendWhatsAppMessage(to: string, body: string, interactive?: any): Promise<void> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_WHATSAPP_NUMBER;
@@ -34,32 +34,65 @@ async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
   const fromAddr = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
 
   try {
-    const message = await client.messages.create({ body, from: fromAddr, to: toAddr });
+    const messageParams: any = {
+      body: body,
+      from: fromAddr,
+      to: toAddr
+    };
+
+    // Add interactive buttons if provided
+    if (interactive) {
+      messageParams.contentSid = interactive.contentSid;
+      messageParams.contentVariables = JSON.stringify(interactive.contentVariables || {});
+    }
+
+    const message = await client.messages.create(messageParams);
     console.log(`✅ Message sent to ${to}: ${message.sid}`);
   } catch (error) {
     console.error('❌ Error sending WhatsApp:', error);
+    // Fallback to plain text if interactive fails
+    try {
+      await client.messages.create({ body, from: fromAddr, to: toAddr });
+    } catch (fallbackError) {
+      console.error('❌ Fallback send also failed:', fallbackError);
+    }
   }
 }
 
-// Show main menu
-function getMainMenu(): string {
-  return `👋 *Welcome to Spenly AI Bot!*
+// Send interactive message with buttons (using Twilio Content API or fallback)
+async function sendInteractiveMenu(to: string, welcomeText: string): Promise<void> {
+  // For now, send formatted text with clear options
+  // Twilio WhatsApp buttons require Content API setup, so we'll use formatted text
+  const menuText = `${welcomeText}
 
-I can help you manage your expenses. Choose an option:
+Choose an option by typing the number or tapping below:
 
 *1️⃣ Add Transaction*
-Send me an expense like "Pizza $15" or "Coffee $5"
+Send expenses like "Pizza $15" or receipt photos
 
 *2️⃣ Get Info*
-Ask me about your spending, balance, or app features
+Ask about spending, balance, or app features
 
 *3️⃣ Exit*
-Type "exit" to end this conversation
+End conversation
 
-Just type the number (1, 2, or 3) or describe what you need!`;
+Type *1*, *2*, or *3* to continue.`;
+
+  await sendWhatsAppMessage(to, menuText);
 }
 
-// Parse transaction using Gemini AI (same logic as Spenly AI)
+// Welcome message after linking
+function getWelcomeMessage(): string {
+  return `Hello! 👋
+
+I am Spenly AI, your financial assistant.
+
+I can help you track expenses, manage your budget, and answer questions about your finances!
+
+Type your queries or choose one of the options below for me to assist you.`;
+}
+
+// Parse transaction using Gemini AI
 async function parseTransactionWithAI(text: string, mediaUrl?: string): Promise<{
   amount: number;
   vendor: string;
@@ -74,7 +107,6 @@ async function parseTransactionWithAI(text: string, mediaUrl?: string): Promise<
   }
 
   try {
-    // Use same prompt structure as Spenly AI
     const prompt = `You are Spenly AI, a financial assistant. Extract transaction details from: "${text}"
 
 Return ONLY valid JSON (no markdown, no code blocks):
@@ -95,11 +127,6 @@ CATEGORY RULES:
 - Bills: electricity, water, internet, phone, utility
 - Income: salary, freelance, payment received
 - Other: everything else
-
-EXAMPLES:
-"Pizza $15" → {"amount":15,"vendor":"Pizza","note":"Pizza","category":"Food & Dining","date":"2025-01-28"}
-"Coffee $5" → {"amount":5,"vendor":"Coffee","note":"Coffee","category":"Food & Dining","date":"2025-01-28"}
-"Uber $20" → {"amount":20,"vendor":"Uber","note":"Uber","category":"Transportation","date":"2025-01-28"}
 
 Extract from: "${text}"`;
 
@@ -129,18 +156,13 @@ Extract from: "${text}"`;
     const data = await response.json();
     const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
-    // Extract JSON from response (handle markdown code blocks)
     let jsonText = aiText.trim();
-    
-    // Remove markdown code blocks if present
     jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
-    // Find JSON object
     const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
-      // Validate and return
       if (parsed.amount !== undefined) {
         return {
           amount: parseFloat(parsed.amount) || 0,
@@ -176,14 +198,12 @@ function parseTransactionFallback(text: string): {
     date: new Date().toISOString().split('T')[0]
   };
   
-  // Extract amount
   const match = text.match(/\$?(\d+(?:\.\d{1,2})?)/);
   if (match) {
     result.amount = parseFloat(match[1]);
     result.vendor = text.replace(match[0], '').trim() || 'Expense';
     result.note = result.vendor;
     
-    // Simple category detection
     const lower = result.vendor.toLowerCase();
     if (lower.includes('pizza') || lower.includes('food') || lower.includes('restaurant') || 
         lower.includes('coffee') || lower.includes('lunch') || lower.includes('dinner') ||
@@ -257,8 +277,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             [apple_user_id, From]
           );
           
-          // Send welcome menu after linking
-          await sendWhatsAppMessage(From, getMainMenu());
+          // Send welcome message with menu
+          await sendInteractiveMenu(From, getWelcomeMessage());
         }
       }
     } else {
@@ -276,18 +296,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const appleUserID = userResult.rows[0].apple_user_id;
         
         // Handle menu options
-        if (lowerBody === 'exit' || lowerBody === '3') {
+        if (lowerBody === 'exit' || lowerBody === '3' || lowerBody === 'exit conversation') {
           await sendWhatsAppMessage(From, "👋 Goodbye! Message me anytime to track expenses.");
-        } else if (lowerBody === '1') {
+        } else if (lowerBody === '1' || lowerBody === 'add transaction' || lowerBody === 'add expense') {
           await sendWhatsAppMessage(From, 
             "💳 *Add Transaction*\n\nSend me an expense like:\n• Pizza $15\n• Coffee $5\n• Lunch $20\n\nOr send a photo of your receipt!"
           );
-        } else if (lowerBody === '2') {
+        } else if (lowerBody === '2' || lowerBody === 'get info' || lowerBody === 'info') {
           await sendWhatsAppMessage(From,
             "ℹ️ *Get Info*\n\nI can help you with:\n• Spending summaries\n• Balance inquiries\n• App features\n• Budget questions\n\nWhat would you like to know?"
           );
-        } else if (lowerBody === 'help' || lowerBody === 'hi' || lowerBody === 'hello') {
-          await sendWhatsAppMessage(From, getMainMenu());
+        } else if (lowerBody === 'help' || lowerBody === 'hi' || lowerBody === 'hello' || lowerBody === 'menu') {
+          await sendInteractiveMenu(From, getWelcomeMessage());
         } else {
           // Try to parse as transaction
           const parsed = await parseTransactionWithAI(Body, mediaUrl);
@@ -300,8 +320,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             );
             
             await sendWhatsAppMessage(From,
-              `✅ *Transaction Added*\n\n💰 Amount: $${parsed.amount.toFixed(2)}\n📝 Note: ${parsed.note}\n📂 Category: ${parsed.category}\n📅 Date: ${parsed.date}\n\n${getMainMenu()}`
+              `✅ *Transaction Added*\n\n💰 Amount: $${parsed.amount.toFixed(2)}\n📝 Note: ${parsed.note}\n📂 Category: ${parsed.category}\n📅 Date: ${parsed.date}\n\n${getWelcomeMessage()}`
             );
+            
+            // Show menu again
+            await sendInteractiveMenu(From, '');
           } else if (messageType === 'image') {
             await db.query(
               `INSERT INTO transactions (apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status)
@@ -310,11 +333,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             );
             
             await sendWhatsAppMessage(From,
-              `✅ Receipt received! I'll process it shortly.\n\n${getMainMenu()}`
+              `✅ Receipt received! I'll process it shortly.`
             );
+            
+            await sendInteractiveMenu(From, '');
           } else {
             // Not a transaction, show menu
-            await sendWhatsAppMessage(From, getMainMenu());
+            await sendInteractiveMenu(From, getWelcomeMessage());
           }
         }
       }
