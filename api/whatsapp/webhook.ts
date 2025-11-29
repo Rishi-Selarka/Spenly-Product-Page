@@ -504,7 +504,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const appleUserID = userResult.rows[0].apple_user_id;
-    const userCurrency = userResult.rows[0].currency || 'USD';
+    const userCurrency = (userResult.rows[0].currency || 'USD').toUpperCase();
     console.log('✅ User linked, processing message:', Body, 'Currency:', userCurrency);
     
     // Handle menu commands
