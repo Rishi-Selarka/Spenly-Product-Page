@@ -25,7 +25,7 @@ async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
   const from = process.env.TWILIO_WHATSAPP_NUMBER;
 
   if (!accountSid || !authToken || !from) {
-    console.error('Twilio credentials not configured');
+    console.error('❌ Twilio credentials not configured');
     return;
   }
 
@@ -36,8 +36,9 @@ async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
   try {
     const message = await client.messages.create({ body, from: fromAddr, to: toAddr });
     console.log(`✅ Message sent to ${to}: ${message.sid}`);
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error sending WhatsApp:', error);
+    throw error;
   }
 }
 
@@ -59,21 +60,24 @@ async function sendInteractiveMenu(to: string, welcomeText?: string): Promise<vo
   await sendWhatsAppMessage(to, menuText);
 }
 
-// Fetch user's transactions from database
 async function getUserTransactions(appleUserID: string, limit: number = 1000): Promise<any[]> {
-  const db = getDB();
-  const result = await db.query(
-    `SELECT amount, transaction_date, vendor, category, note, message_type, created_at
-     FROM transactions 
-     WHERE apple_user_id = $1 
-     ORDER BY transaction_date DESC, created_at DESC 
-     LIMIT $2`,
-    [appleUserID, limit]
-  );
-  return result.rows;
+  try {
+    const db = getDB();
+    const result = await db.query(
+      `SELECT amount, transaction_date, vendor, category, note, message_type, created_at
+       FROM transactions 
+       WHERE apple_user_id = $1 
+       ORDER BY transaction_date DESC, created_at DESC 
+       LIMIT $2`,
+      [appleUserID, limit]
+    );
+    return result.rows || [];
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    return [];
+  }
 }
 
-// Answer questions using Gemini AI with transaction data
 async function answerQuestionWithAI(question: string, transactions: any[]): Promise<string> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey || geminiApiKey === 'YOUR_GEMINI_API_KEY_HERE') {
@@ -81,28 +85,24 @@ async function answerQuestionWithAI(question: string, transactions: any[]): Prom
   }
 
   try {
-    // Format transactions for context
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    // Calculate summary stats
-    const allExpenses = transactions.filter(t => parseFloat(t.amount) > 0);
+    const allExpenses = transactions.filter(t => parseFloat(t.amount || '0') > 0);
     const todayExpenses = allExpenses.filter(t => t.transaction_date === today);
     const yesterdayExpenses = allExpenses.filter(t => t.transaction_date === yesterday);
     
-    const todayTotal = todayExpenses.reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    const yesterdayTotal = yesterdayExpenses.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const todayTotal = todayExpenses.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
+    const yesterdayTotal = yesterdayExpenses.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
     
-    // Get this month's transactions
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const currentMonth = new Date().toISOString().slice(0, 7);
     const monthExpenses = allExpenses.filter(t => t.transaction_date?.startsWith(currentMonth));
-    const monthTotal = monthExpenses.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const monthTotal = monthExpenses.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
     
-    // Category breakdown
     const categoryTotals: { [key: string]: number } = {};
     allExpenses.forEach(t => {
       const cat = t.category || 'Other';
-      categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(t.amount);
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(t.amount || '0');
     });
     
     const categoryBreakdown = Object.entries(categoryTotals)
@@ -112,7 +112,7 @@ async function answerQuestionWithAI(question: string, transactions: any[]): Prom
       .join('\n');
 
     const transactionContext = transactions.slice(0, 20).map(t => 
-      `Date: ${t.transaction_date}, Amount: $${parseFloat(t.amount).toFixed(2)}, Category: ${t.category || 'Other'}, Note: ${t.note || t.vendor || 'N/A'}`
+      `Date: ${t.transaction_date}, Amount: $${parseFloat(t.amount || '0').toFixed(2)}, Category: ${t.category || 'Other'}, Note: ${t.note || t.vendor || 'N/A'}`
     ).join('\n');
 
     const prompt = `You are Spenly AI, a financial assistant. Answer the user's question based on their transaction data.
@@ -164,6 +164,8 @@ Answer the question: "${question}"`;
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Gemini API error: ${response.status} - ${errorText}`);
       throw new Error(`Gemini API error: ${response.status}`);
     }
 
@@ -171,23 +173,20 @@ Answer the question: "${question}"`;
     const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
     return aiText.trim() || "I couldn't process that question. Please try rephrasing it.";
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error answering question:', error);
     return "Sorry, I encountered an error processing your question. Please try again.";
   }
 }
 
-// Check if message is a question/info request (not a transaction)
 function isInfoQuery(text: string): boolean {
   const lower = text.toLowerCase().trim();
   
-  // Menu commands
   if (lower === '1' || lower === '2' || lower === '3' || 
       lower === 'exit' || lower === 'help' || lower === 'hi' || lower === 'hello' || lower === 'menu') {
-    return false; // These are menu commands, handle separately
+    return false;
   }
   
-  // Question patterns
   const questionPatterns = [
     /how much/i,
     /how many/i,
@@ -211,13 +210,12 @@ function isInfoQuery(text: string): boolean {
     /week/i,
     /month/i,
     /year/i,
-    /?\s*$/  // Ends with question mark
+    /?\s*$/
   ];
   
   return questionPatterns.some(pattern => pattern.test(lower));
 }
 
-// Parse transaction using Gemini AI
 async function parseTransactionWithAI(text: string, mediaUrl?: string): Promise<{
   amount: number;
   vendor: string;
@@ -355,130 +353,192 @@ function parseTransactionFallback(text: string): {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Always return TwiML response
+  const sendResponse = () => {
+    res.setHeader('Content-Type', 'text/xml');
+    return res.status(200).send('<Response></Response>');
+  };
+
   if (req.method !== 'POST') {
+    console.log('❌ Invalid method:', req.method);
     return res.status(405).send('Method not allowed');
   }
 
   try {
+    // Twilio sends form-urlencoded data, Vercel parses it automatically
     const params = req.body || {};
     const From = params.From || '';
-    const Body = params.Body || '';
+    const Body = (params.Body || '').trim();
     const NumMedia = params.NumMedia || '0';
     const MediaUrl0 = params.MediaUrl0 || '';
+    
+    console.log('📨 Webhook received:', { From, Body, NumMedia, MediaUrl0 });
+    
+    if (!From) {
+      console.error('❌ Missing From field');
+      return sendResponse();
+    }
     
     const messageType = (NumMedia && parseInt(NumMedia) > 0) ? 'image' : 'text';
     const mediaUrl = messageType === 'image' ? MediaUrl0 : null;
 
-    console.log(`📨 Webhook from ${From}: "${Body}" (type: ${messageType})`);
-
     const db = getDB();
-    const lowerBody = Body.trim().toLowerCase();
+    const lowerBody = Body.toLowerCase();
 
     // Handle linking
     if (lowerBody.startsWith('link_')) {
       const token = lowerBody.replace('link_', '');
+      console.log(`🔗 Processing link token: ${token}`);
       
-      const tokenResult = await db.query(
-        `SELECT apple_user_id, expires_at, used_at FROM link_tokens WHERE token = $1`,
-        [token]
-      );
+      try {
+        const tokenResult = await db.query(
+          `SELECT apple_user_id, expires_at, used_at FROM link_tokens WHERE token = $1`,
+          [token]
+        );
 
-      if (tokenResult.rows.length === 0) {
-        await sendWhatsAppMessage(From, "❌ Invalid linking code.");
-      } else {
-        const { apple_user_id, expires_at, used_at } = tokenResult.rows[0];
-        
-        if (used_at || new Date() > new Date(expires_at)) {
-          await sendWhatsAppMessage(From, "❌ Code expired or already used.");
+        if (tokenResult.rows.length === 0) {
+          await sendWhatsAppMessage(From, "❌ Invalid linking code.");
         } else {
-          await db.query(`UPDATE link_tokens SET used_at = NOW() WHERE token = $1`, [token]);
-          await db.query(
-            `INSERT INTO users (apple_user_id, whatsapp_number, linked_at) VALUES ($1, $2, NOW())
-             ON CONFLICT (apple_user_id) DO UPDATE SET whatsapp_number = $2, linked_at = NOW()`,
-            [apple_user_id, From]
-          );
+          const { apple_user_id, expires_at, used_at } = tokenResult.rows[0];
           
-          await sendInteractiveMenu(From, getWelcomeMessage());
+          if (used_at || new Date() > new Date(expires_at)) {
+            await sendWhatsAppMessage(From, "❌ Code expired or already used.");
+          } else {
+            await db.query(`UPDATE link_tokens SET used_at = NOW() WHERE token = $1`, [token]);
+            await db.query(
+              `INSERT INTO users (apple_user_id, whatsapp_number, linked_at) VALUES ($1, $2, NOW())
+               ON CONFLICT (apple_user_id) DO UPDATE SET whatsapp_number = $2, linked_at = NOW()`,
+              [apple_user_id, From]
+            );
+            
+            await sendInteractiveMenu(From, getWelcomeMessage());
+          }
         }
+      } catch (error: any) {
+        console.error('❌ Link error:', error);
+        await sendWhatsAppMessage(From, "❌ Error processing link. Please try again.");
       }
-    } else {
-      // Check if user is linked
-      const userResult = await db.query(
+      
+      return sendResponse();
+    }
+    
+    // Check if user is linked
+    let userResult;
+    try {
+      userResult = await db.query(
         `SELECT apple_user_id FROM users WHERE whatsapp_number = $1`,
         [From]
       );
-
-      if (userResult.rows.length === 0) {
-        await sendWhatsAppMessage(From, 
-          "👋 Welcome! Please link your account first.\n\nGo to Spenly app → Settings → Connect WhatsApp Bot to get your linking code."
-        );
-      } else {
-        const appleUserID = userResult.rows[0].apple_user_id;
-        
-        // Handle menu commands
-        if (lowerBody === 'exit' || lowerBody === '3' || lowerBody === 'exit conversation') {
-          await sendWhatsAppMessage(From, "👋 Goodbye! Message me anytime to track expenses.");
-        } else if (lowerBody === '1' || lowerBody === 'add transaction' || lowerBody === 'add expense') {
-          await sendWhatsAppMessage(From, 
-            "💳 *Add Transaction*\n\nSend me an expense like:\n• Pizza $15\n• Coffee $5\n• Lunch $20\n\nOr send a photo of your receipt!"
-          );
-        } else if (lowerBody === '2' || lowerBody === 'get info' || lowerBody === 'info') {
-          await sendWhatsAppMessage(From,
-            "ℹ️ *Get Info*\n\nI can help you with:\n• Spending summaries\n• Balance inquiries\n• App features\n• Budget questions\n\nWhat would you like to know?"
-          );
-        } else if (lowerBody === 'help' || lowerBody === 'hi' || lowerBody === 'hello' || lowerBody === 'menu') {
-          await sendInteractiveMenu(From, getWelcomeMessage());
-        } else {
-          // Check if it's an image
-          if (messageType === 'image') {
-            await db.query(
-              `INSERT INTO transactions (apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status)
-               VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, $7, 'pending_sync')`,
-              [appleUserID, 0, 'Receipt', 'Other', 'Receipt Image', messageType, mediaUrl]
-            );
-            
-            await sendWhatsAppMessage(From,
-              `✅ Receipt received! I'll process it shortly.`
-            );
-            return res.status(200).send('<Response></Response>');
-          }
-          
-          // Check if it's an info query (question)
-          if (isInfoQuery(Body)) {
-            console.log(`🤔 Detected info query: "${Body}"`);
-            const transactions = await getUserTransactions(appleUserID);
-            const answer = await answerQuestionWithAI(Body, transactions);
-            await sendWhatsAppMessage(From, answer);
-            return res.status(200).send('<Response></Response>');
-          }
-          
-          // Try to parse as transaction
-          const parsed = await parseTransactionWithAI(Body, mediaUrl);
-          
-          if (parsed && parsed.amount > 0) {
-            await db.query(
-              `INSERT INTO transactions (apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending_sync')`,
-              [appleUserID, parsed.amount, parsed.date, parsed.vendor, parsed.category, parsed.note, messageType, mediaUrl]
-            );
-            
-            await sendWhatsAppMessage(From,
-              `✅ *Transaction Added*\n\n💰 Amount: $${parsed.amount.toFixed(2)}\n📝 Note: ${parsed.note}\n📂 Category: ${parsed.category}\n📅 Date: ${parsed.date}`
-            );
-          } else {
-            // If not a transaction and not a question, show menu
-            await sendInteractiveMenu(From, "I didn't understand that. Here are your options:");
-          }
-        }
-      }
+    } catch (error: any) {
+      console.error('❌ DB query error:', error);
+      await sendWhatsAppMessage(From, "❌ Database error. Please try again later.");
+      return sendResponse();
     }
 
-    res.setHeader('Content-Type', 'text/xml');
-    return res.status(200).send('<Response></Response>');
+    if (userResult.rows.length === 0) {
+      await sendWhatsAppMessage(From, 
+        "👋 Welcome! Please link your account first.\n\nGo to Spenly app → Settings → Connect WhatsApp Bot to get your linking code."
+      );
+      return sendResponse();
+    }
+    
+    const appleUserID = userResult.rows[0].apple_user_id;
+    
+    // Handle menu commands
+    if (lowerBody === 'exit' || lowerBody === '3' || lowerBody === 'exit conversation') {
+      await sendWhatsAppMessage(From, "👋 Goodbye! Message me anytime to track expenses.");
+      return sendResponse();
+    }
+    
+    if (lowerBody === '1' || lowerBody === 'add transaction' || lowerBody === 'add expense') {
+      await sendWhatsAppMessage(From, 
+        "💳 *Add Transaction*\n\nSend me an expense like:\n• Pizza $15\n• Coffee $5\n• Lunch $20\n\nOr send a photo of your receipt!"
+      );
+      return sendResponse();
+    }
+    
+    if (lowerBody === '2' || lowerBody === 'get info' || lowerBody === 'info') {
+      await sendWhatsAppMessage(From,
+        "ℹ️ *Get Info*\n\nI can help you with:\n• Spending summaries\n• Balance inquiries\n• App features\n• Budget questions\n\nWhat would you like to know?"
+      );
+      return sendResponse();
+    }
+    
+    if (lowerBody === 'help' || lowerBody === 'hi' || lowerBody === 'hello' || lowerBody === 'menu') {
+      await sendInteractiveMenu(From, getWelcomeMessage());
+      return sendResponse();
+    }
+    
+    // Handle image
+    if (messageType === 'image') {
+      try {
+        await db.query(
+          `INSERT INTO transactions (apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status)
+           VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, $7, 'pending_sync')`,
+          [appleUserID, 0, 'Receipt', 'Other', 'Receipt Image', messageType, mediaUrl]
+        );
+        
+        await sendWhatsAppMessage(From, `✅ Receipt received! I'll process it shortly.`);
+      } catch (error: any) {
+        console.error('❌ Image save error:', error);
+        await sendWhatsAppMessage(From, "❌ Error saving receipt. Please try again.");
+      }
+      return sendResponse();
+    }
+    
+    // Check if it's an info query
+    if (isInfoQuery(Body)) {
+      console.log(`🤔 Detected info query: "${Body}"`);
+      try {
+        const transactions = await getUserTransactions(appleUserID);
+        const answer = await answerQuestionWithAI(Body, transactions);
+        await sendWhatsAppMessage(From, answer);
+      } catch (error: any) {
+        console.error('❌ Info query error:', error);
+        await sendWhatsAppMessage(From, "Sorry, I encountered an error. Please try again.");
+      }
+      return sendResponse();
+    }
+    
+    // Try to parse as transaction
+    try {
+      const parsed = await parseTransactionWithAI(Body, mediaUrl);
+      
+      if (parsed && parsed.amount > 0) {
+        await db.query(
+          `INSERT INTO transactions (apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending_sync')`,
+          [appleUserID, parsed.amount, parsed.date, parsed.vendor, parsed.category, parsed.note, messageType, mediaUrl]
+        );
+        
+        await sendWhatsAppMessage(From,
+          `✅ *Transaction Added*\n\n💰 Amount: $${parsed.amount.toFixed(2)}\n📝 Note: ${parsed.note}\n📂 Category: ${parsed.category}\n📅 Date: ${parsed.date}`
+        );
+      } else {
+        // Not a transaction, show menu
+        await sendInteractiveMenu(From, "I didn't understand that. Here are your options:");
+      }
+    } catch (error: any) {
+      console.error('❌ Transaction parse error:', error);
+      await sendWhatsAppMessage(From, "Sorry, I couldn't process that. Please try again or type 'help' for options.");
+    }
+    
+    return sendResponse();
 
   } catch (error: any) {
     console.error('❌ Webhook error:', error);
-    res.setHeader('Content-Type', 'text/xml');
-    return res.status(200).send('<Response></Response>');
+    console.error('Error stack:', error.stack);
+    
+    // Try to send error message if we have From
+    try {
+      const From = req.body?.From;
+      if (From) {
+        await sendWhatsAppMessage(From, "Sorry, I encountered an error. Please try again.");
+      }
+    } catch (sendError) {
+      console.error('Failed to send error message:', sendError);
+    }
+    
+    return sendResponse();
   }
 }
