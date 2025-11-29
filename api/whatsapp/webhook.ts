@@ -25,19 +25,26 @@ async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
   const from = process.env.TWILIO_WHATSAPP_NUMBER;
 
   if (!accountSid || !authToken || !from) {
-    console.error('❌ Twilio credentials not configured');
-    return;
+    console.error('❌ Twilio credentials missing:', {
+      hasAccountSid: !!accountSid,
+      hasAuthToken: !!authToken,
+      hasFrom: !!from
+    });
+    throw new Error('Twilio credentials not configured');
   }
 
   const client = Twilio(accountSid, authToken);
   const toAddr = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
   const fromAddr = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
 
+  console.log(`📤 Sending message to ${toAddr} from ${fromAddr}`);
+  
   try {
     const message = await client.messages.create({ body, from: fromAddr, to: toAddr });
-    console.log(`✅ Message sent to ${to}: ${message.sid}`);
+    console.log(`✅ Message sent successfully: ${message.sid}`);
   } catch (error: any) {
-    console.error('❌ Error sending WhatsApp:', error);
+    console.error('❌ Error sending WhatsApp:', error.message);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     throw error;
   }
 }
@@ -359,20 +366,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send('<Response></Response>');
   };
 
+  console.log('🚀 Webhook called at:', new Date().toISOString());
+  console.log('Method:', req.method);
+  console.log('Body type:', typeof req.body);
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+
   if (req.method !== 'POST') {
     console.log('❌ Invalid method:', req.method);
     return res.status(405).send('Method not allowed');
   }
 
   try {
-    // Twilio sends form-urlencoded data, Vercel parses it automatically
-    const params = req.body || {};
+    // Twilio sends form-urlencoded data
+    // Vercel should parse it automatically, but let's handle both cases
+    let params: any = {};
+    
+    if (typeof req.body === 'string') {
+      // Parse form-urlencoded manually if needed
+      const urlParams = new URLSearchParams(req.body);
+      params = Object.fromEntries(urlParams);
+    } else if (req.body && typeof req.body === 'object') {
+      params = req.body;
+    }
+    
     const From = params.From || '';
     const Body = (params.Body || '').trim();
     const NumMedia = params.NumMedia || '0';
     const MediaUrl0 = params.MediaUrl0 || '';
     
-    console.log('📨 Webhook received:', { From, Body, NumMedia, MediaUrl0 });
+    console.log('📨 Parsed params:', { From, Body, NumMedia, MediaUrl0 });
     
     if (!From) {
       console.error('❌ Missing From field');
@@ -397,11 +420,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         );
 
         if (tokenResult.rows.length === 0) {
+          console.log('❌ Invalid token');
           await sendWhatsAppMessage(From, "❌ Invalid linking code.");
         } else {
           const { apple_user_id, expires_at, used_at } = tokenResult.rows[0];
           
           if (used_at || new Date() > new Date(expires_at)) {
+            console.log('❌ Token expired or used');
             await sendWhatsAppMessage(From, "❌ Code expired or already used.");
           } else {
             await db.query(`UPDATE link_tokens SET used_at = NOW() WHERE token = $1`, [token]);
@@ -411,6 +436,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               [apple_user_id, From]
             );
             
+            console.log('✅ Account linked successfully');
             await sendInteractiveMenu(From, getWelcomeMessage());
           }
         }
@@ -429,6 +455,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `SELECT apple_user_id FROM users WHERE whatsapp_number = $1`,
         [From]
       );
+      console.log('👤 User lookup result:', userResult.rows.length > 0 ? 'Found' : 'Not found');
     } catch (error: any) {
       console.error('❌ DB query error:', error);
       await sendWhatsAppMessage(From, "❌ Database error. Please try again later.");
@@ -436,6 +463,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (userResult.rows.length === 0) {
+      console.log('❌ User not linked');
       await sendWhatsAppMessage(From, 
         "👋 Welcome! Please link your account first.\n\nGo to Spenly app → Settings → Connect WhatsApp Bot to get your linking code."
       );
@@ -443,6 +471,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const appleUserID = userResult.rows[0].apple_user_id;
+    console.log('✅ User linked, processing message:', Body);
     
     // Handle menu commands
     if (lowerBody === 'exit' || lowerBody === '3' || lowerBody === 'exit conversation') {
@@ -465,6 +494,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (lowerBody === 'help' || lowerBody === 'hi' || lowerBody === 'hello' || lowerBody === 'menu') {
+      console.log('📋 Showing menu');
       await sendInteractiveMenu(From, getWelcomeMessage());
       return sendResponse();
     }
@@ -516,6 +546,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         );
       } else {
         // Not a transaction, show menu
+        console.log('❓ Unknown message, showing menu');
         await sendInteractiveMenu(From, "I didn't understand that. Here are your options:");
       }
     } catch (error: any) {
@@ -531,7 +562,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Try to send error message if we have From
     try {
-      const From = req.body?.From;
+      const From = req.body?.From || (typeof req.body === 'object' && req.body ? (req.body as any).From : '');
       if (From) {
         await sendWhatsAppMessage(From, "Sorry, I encountered an error. Please try again.");
       }
