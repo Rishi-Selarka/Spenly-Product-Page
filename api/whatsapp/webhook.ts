@@ -19,6 +19,30 @@ function getDB(): Pool {
   return pool;
 }
 
+async function ensureSchema(): Promise<void> {
+  const db = getDB();
+  try {
+    // Add currency columns if they don't exist (migration)
+    await db.query(`
+      ALTER TABLE link_tokens 
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+    `).catch(() => {}); // Ignore if column already exists or table doesn't exist
+    
+    await db.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+    `).catch(() => {});
+    
+    await db.query(`
+      ALTER TABLE transactions 
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+    `).catch(() => {});
+  } catch (error) {
+    // Schema migration errors are non-critical, just log
+    console.log('Schema migration note:', error);
+  }
+}
+
 async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -384,6 +408,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Content-Type', 'text/xml');
     return res.status(200).send('<Response></Response>');
   };
+
+  // Ensure schema is up to date
+  await ensureSchema();
 
   console.log('🚀 Webhook called at:', new Date().toISOString());
   console.log('Method:', req.method);

@@ -26,11 +26,11 @@ async function createSchema(): Promise<void> {
   const db = getDB();
   const client = await db.connect();
   try {
+    // Create tables
     await client.query(`
       CREATE TABLE IF NOT EXISTS link_tokens (
         token VARCHAR(255) PRIMARY KEY,
         apple_user_id VARCHAR(255) NOT NULL,
-        currency VARCHAR(10) DEFAULT 'USD',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
         used_at TIMESTAMP WITH TIME ZONE
@@ -40,7 +40,6 @@ async function createSchema(): Promise<void> {
       CREATE TABLE IF NOT EXISTS users (
         apple_user_id VARCHAR(255) PRIMARY KEY,
         whatsapp_number VARCHAR(255) UNIQUE,
-        currency VARCHAR(10) DEFAULT 'USD',
         linked_at TIMESTAMP WITH TIME ZONE
       )
     `);
@@ -49,7 +48,6 @@ async function createSchema(): Promise<void> {
         id SERIAL PRIMARY KEY,
         apple_user_id VARCHAR(255) NOT NULL,
         amount NUMERIC(10, 2) NOT NULL,
-        currency VARCHAR(10) DEFAULT 'USD',
         transaction_date DATE NOT NULL,
         vendor VARCHAR(255),
         category VARCHAR(255),
@@ -60,6 +58,40 @@ async function createSchema(): Promise<void> {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    
+    // Add currency columns if they don't exist (migration)
+    try {
+      await client.query(`
+        ALTER TABLE link_tokens 
+        ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+      `);
+    } catch (e: any) {
+      if (!e.message.includes('already exists')) {
+        console.error('Error adding currency to link_tokens:', e);
+      }
+    }
+    
+    try {
+      await client.query(`
+        ALTER TABLE users 
+        ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+      `);
+    } catch (e: any) {
+      if (!e.message.includes('already exists')) {
+        console.error('Error adding currency to users:', e);
+      }
+    }
+    
+    try {
+      await client.query(`
+        ALTER TABLE transactions 
+        ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+      `);
+    } catch (e: any) {
+      if (!e.message.includes('already exists')) {
+        console.error('Error adding currency to transactions:', e);
+      }
+    }
   } finally {
     client.release();
   }

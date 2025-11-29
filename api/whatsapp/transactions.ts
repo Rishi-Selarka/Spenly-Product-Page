@@ -19,6 +19,18 @@ function getDB(): Pool {
   return pool;
 }
 
+async function ensureSchema(): Promise<void> {
+  const db = getDB();
+  try {
+    await db.query(`
+      ALTER TABLE transactions 
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+    `).catch(() => {});
+  } catch (error) {
+    console.log('Schema migration note:', error);
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -29,6 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    await ensureSchema();
     const db = getDB();
 
     if (req.method === 'GET') {
