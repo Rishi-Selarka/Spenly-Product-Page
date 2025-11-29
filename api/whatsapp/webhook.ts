@@ -151,7 +151,7 @@ INSTRUCTIONS:
 
 Answer the question: "${question}"`;
 
-    const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-haiku';
+    const model = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
     
     const body = {
@@ -262,7 +262,7 @@ CATEGORY RULES:
 
 Extract from: "${text}"`;
 
-    const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-haiku';
+    const model = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
     
     const body = {
