@@ -255,7 +255,7 @@ Return ONLY valid JSON:
   "date": "<YYYY-MM-DD>"
 }
 
-IMPORTANT: Extract the numeric amount only. If the message contains "$" or "dollar", the currency is USD. Otherwise, assume the amount is in the user's local currency (${userCurrency}).`;
+IMPORTANT: Extract the numeric amount only. If the message contains "$" or "dollar", the currency is USD. Otherwise, assume the amount is in the user's local currency (${userCurrency}).
 
 CATEGORY RULES:
 - Food & Dining: food, restaurant, pizza, coffee, lunch, dinner, cafe, grocery
