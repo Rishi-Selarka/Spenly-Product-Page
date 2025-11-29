@@ -226,19 +226,24 @@ function isInfoQuery(text: string): boolean {
   return questionPatterns.some(pattern => pattern.test(lower));
 }
 
-async function parseTransactionWithAI(text: string, mediaUrl?: string): Promise<{
+async function parseTransactionWithAI(text: string, mediaUrl?: string, userCurrency: string = 'USD'): Promise<{
   amount: number;
   vendor: string;
   note: string;
   category: string;
   date: string;
+  currency: string;
 } | null> {
   const openRouterApiKey = process.env.OPENROUTER_API_KEY;
   if (!openRouterApiKey || openRouterApiKey === 'YOUR_OPENROUTER_API_KEY_HERE') {
-    return parseTransactionFallback(text);
+    return parseTransactionFallback(text, userCurrency);
   }
 
   try {
+    // Detect currency from message
+    const hasDollar = /\$/.test(text);
+    const detectedCurrency = hasDollar ? 'USD' : userCurrency;
+    
     const prompt = `You are Spenly AI. Extract transaction details from: "${text}"
 
 Return ONLY valid JSON:
@@ -249,6 +254,8 @@ Return ONLY valid JSON:
   "category": "<Food & Dining|Shopping|Transportation|Entertainment|Healthcare|Bills|Income|Other>",
   "date": "<YYYY-MM-DD>"
 }
+
+IMPORTANT: Extract the numeric amount only. If the message contains "$" or "dollar", the currency is USD. Otherwise, assume the amount is in the user's local currency (${userCurrency}).`;
 
 CATEGORY RULES:
 - Food & Dining: food, restaurant, pizza, coffee, lunch, dinner, cafe, grocery
@@ -304,7 +311,8 @@ Extract from: "${text}"`;
           vendor: parsed.vendor || 'Expense',
           note: parsed.note || parsed.vendor || 'Expense',
           category: parsed.category || 'Other',
-          date: parsed.date || new Date().toISOString().split('T')[0]
+          date: parsed.date || new Date().toISOString().split('T')[0],
+          currency: detectedCurrency
         };
       }
     }
@@ -312,22 +320,27 @@ Extract from: "${text}"`;
     console.error('OpenRouter parsing error:', error);
   }
 
-  return parseTransactionFallback(text);
+  return parseTransactionFallback(text, userCurrency);
 }
 
-function parseTransactionFallback(text: string): {
+function parseTransactionFallback(text: string, userCurrency: string = 'USD'): {
   amount: number;
   vendor: string;
   note: string;
   category: string;
   date: string;
+  currency: string;
 } {
+  const hasDollar = /\$/.test(text);
+  const detectedCurrency = hasDollar ? 'USD' : userCurrency;
+  
   const result = {
     amount: 0,
     vendor: 'Expense',
     note: text || 'Expense',
     category: 'Other',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    currency: detectedCurrency
   };
   
   const match = text.match(/\$?(\d+(?:\.\d{1,2})?)/);
@@ -442,10 +455,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             await sendWhatsAppMessage(From, "❌ Code expired or already used.");
           } else {
             await db.query(`UPDATE link_tokens SET used_at = NOW() WHERE token = $1`, [token]);
+            
+            // Get user's currency from link_tokens or default to USD
+            const tokenData = await db.query(
+              `SELECT currency FROM link_tokens WHERE token = $1`,
+              [token]
+            );
+            const userCurrency = tokenData.rows[0]?.currency || 'USD';
+            
             await db.query(
-              `INSERT INTO users (apple_user_id, whatsapp_number, linked_at) VALUES ($1, $2, NOW())
-               ON CONFLICT (apple_user_id) DO UPDATE SET whatsapp_number = $2, linked_at = NOW()`,
-              [apple_user_id, From]
+              `INSERT INTO users (apple_user_id, whatsapp_number, currency, linked_at) VALUES ($1, $2, $3, NOW())
+               ON CONFLICT (apple_user_id) DO UPDATE SET whatsapp_number = $2, currency = $3, linked_at = NOW()`,
+              [apple_user_id, From, userCurrency]
             );
             
             console.log('✅ Account linked successfully');
@@ -464,7 +485,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let userResult;
     try {
       userResult = await db.query(
-        `SELECT apple_user_id FROM users WHERE whatsapp_number = $1`,
+        `SELECT apple_user_id, currency FROM users WHERE whatsapp_number = $1`,
         [From]
       );
       console.log('👤 User lookup result:', userResult.rows.length > 0 ? 'Found' : 'Not found');
@@ -483,7 +504,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const appleUserID = userResult.rows[0].apple_user_id;
-    console.log('✅ User linked, processing message:', Body);
+    const userCurrency = userResult.rows[0].currency || 'USD';
+    console.log('✅ User linked, processing message:', Body, 'Currency:', userCurrency);
     
     // Handle menu commands
     if (lowerBody === 'exit' || lowerBody === '3' || lowerBody === 'exit conversation') {
@@ -544,17 +566,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Try to parse as transaction
     try {
-      const parsed = await parseTransactionWithAI(Body, mediaUrl);
+      const parsed = await parseTransactionWithAI(Body, mediaUrl, userCurrency);
       
       if (parsed && parsed.amount > 0) {
         await db.query(
-          `INSERT INTO transactions (apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending_sync')`,
-          [appleUserID, parsed.amount, parsed.date, parsed.vendor, parsed.category, parsed.note, messageType, mediaUrl]
+          `INSERT INTO transactions (apple_user_id, amount, currency, transaction_date, vendor, category, note, message_type, media_url, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending_sync')`,
+          [appleUserID, parsed.amount, parsed.currency, parsed.date, parsed.vendor, parsed.category, parsed.note, messageType, mediaUrl]
         );
         
+        const currencySymbol = parsed.currency === 'USD' ? '$' : (parsed.currency === 'INR' ? '₹' : parsed.currency);
         await sendWhatsAppMessage(From,
-          `✅ *Transaction Added*\n\n💰 Amount: $${parsed.amount.toFixed(2)}\n📝 Note: ${parsed.note}\n📂 Category: ${parsed.category}\n📅 Date: ${parsed.date}`
+          `✅ *Transaction Added*\n\n💰 Amount: ${currencySymbol}${parsed.amount.toFixed(2)}\n📝 Note: ${parsed.note}\n📂 Category: ${parsed.category}\n📅 Date: ${parsed.date}`
         );
       } else {
         // Not a transaction, show menu

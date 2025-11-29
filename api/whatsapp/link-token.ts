@@ -30,6 +30,7 @@ async function createSchema(): Promise<void> {
       CREATE TABLE IF NOT EXISTS link_tokens (
         token VARCHAR(255) PRIMARY KEY,
         apple_user_id VARCHAR(255) NOT NULL,
+        currency VARCHAR(10) DEFAULT 'USD',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
         used_at TIMESTAMP WITH TIME ZONE
@@ -39,6 +40,7 @@ async function createSchema(): Promise<void> {
       CREATE TABLE IF NOT EXISTS users (
         apple_user_id VARCHAR(255) PRIMARY KEY,
         whatsapp_number VARCHAR(255) UNIQUE,
+        currency VARCHAR(10) DEFAULT 'USD',
         linked_at TIMESTAMP WITH TIME ZONE
       )
     `);
@@ -47,6 +49,7 @@ async function createSchema(): Promise<void> {
         id SERIAL PRIMARY KEY,
         apple_user_id VARCHAR(255) NOT NULL,
         amount NUMERIC(10, 2) NOT NULL,
+        currency VARCHAR(10) DEFAULT 'USD',
         transaction_date DATE NOT NULL,
         vendor VARCHAR(255),
         category VARCHAR(255),
@@ -76,11 +79,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { apple_user_id } = req.body || {};
+    const { apple_user_id, currency } = req.body || {};
 
     if (!apple_user_id) {
       return res.status(400).json({ error: 'apple_user_id is required' });
     }
+    
+    const userCurrency = currency || 'USD';
 
     await createSchema();
     
@@ -89,8 +94,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const db = getDB();
     await db.query(
-      `INSERT INTO link_tokens (token, apple_user_id, expires_at) VALUES ($1, $2, $3)`,
-      [token, apple_user_id, expiresAt]
+      `INSERT INTO link_tokens (token, apple_user_id, currency, expires_at) VALUES ($1, $2, $3, $4)`,
+      [token, apple_user_id, userCurrency, expiresAt]
     );
 
     return res.status(200).json({

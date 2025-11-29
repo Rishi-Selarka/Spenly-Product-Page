@@ -40,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         const result = await db.query(
-          `SELECT id, apple_user_id, amount, transaction_date, vendor, category, note, message_type, media_url, status, created_at
+          `SELECT id, apple_user_id, amount, currency, transaction_date, vendor, category, note, message_type, media_url, status, created_at
            FROM transactions
            WHERE apple_user_id = $1 AND status = 'pending_sync'
            ORDER BY created_at ASC`,
@@ -52,6 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           id: row.id,
           apple_user_id: row.apple_user_id,
           amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount, // Convert string to number
+          currency: row.currency || 'USD',
           date: row.transaction_date ? new Date(row.transaction_date).toISOString().split('T')[0] : null,
           vendor: row.vendor,
           category: row.category,
