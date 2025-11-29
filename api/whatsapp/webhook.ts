@@ -86,9 +86,9 @@ async function getUserTransactions(appleUserID: string, limit: number = 1000): P
 }
 
 async function answerQuestionWithAI(question: string, transactions: any[]): Promise<string> {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  if (!geminiApiKey || geminiApiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-    return "I need Gemini API key configured to answer questions. Please set GEMINI_API_KEY in Vercel environment variables.";
+  const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+  if (!openRouterApiKey || openRouterApiKey === 'YOUR_OPENROUTER_API_KEY_HERE') {
+    return "I need OpenRouter API key configured to answer questions. Please set OPENROUTER_API_KEY in Vercel environment variables.";
   }
 
   try {
@@ -151,33 +151,36 @@ INSTRUCTIONS:
 
 Answer the question: "${question}"`;
 
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`;
+    const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-haiku';
+    const url = 'https://openrouter.ai/api/v1/chat/completions';
     
     const body = {
-      contents: [{
+      model: model,
+      messages: [{
         role: 'user',
-        parts: [{ text: prompt }]
+        content: prompt
       }],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 500
-      }
+      temperature: 0.3,
+      max_tokens: 500
     };
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openRouterApiKey}`
+      },
       body: JSON.stringify(body)
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Gemini API error: ${response.status} - ${errorText}`);
-      throw new Error(`Gemini API error: ${response.status}`);
+      console.error(`OpenRouter API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenRouter API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const aiText = data.choices?.[0]?.message?.content || '';
     
     return aiText.trim() || "I couldn't process that question. Please try rephrasing it.";
   } catch (error: any) {
@@ -230,8 +233,8 @@ async function parseTransactionWithAI(text: string, mediaUrl?: string): Promise<
   category: string;
   date: string;
 } | null> {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  if (!geminiApiKey || geminiApiKey === 'YOUR_GEMINI_API_KEY_HERE') {
+  const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+  if (!openRouterApiKey || openRouterApiKey === 'YOUR_OPENROUTER_API_KEY_HERE') {
     return parseTransactionFallback(text);
   }
 
@@ -259,31 +262,34 @@ CATEGORY RULES:
 
 Extract from: "${text}"`;
 
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`;
+    const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-haiku';
+    const url = 'https://openrouter.ai/api/v1/chat/completions';
     
     const body = {
-      contents: [{
+      model: model,
+      messages: [{
         role: 'user',
-        parts: [{ text: prompt }]
+        content: prompt
       }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 200
-      }
+      temperature: 0.1,
+      max_tokens: 200
     };
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openRouterApiKey}`
+      },
       body: JSON.stringify(body)
     });
 
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
+      throw new Error(`OpenRouter API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const aiText = data.choices?.[0]?.message?.content || '';
     
     let jsonText = aiText.trim();
     jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -303,7 +309,7 @@ Extract from: "${text}"`;
       }
     }
   } catch (error) {
-    console.error('Gemini parsing error:', error);
+    console.error('OpenRouter parsing error:', error);
   }
 
   return parseTransactionFallback(text);
