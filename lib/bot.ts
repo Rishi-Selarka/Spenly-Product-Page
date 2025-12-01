@@ -515,4 +515,3 @@ async function getAppleUserIdByWhatsApp(whatsappNumber: string): Promise<string 
   );
   return result.rows.length > 0 ? result.rows[0].apple_user_id : null;
 }
-
