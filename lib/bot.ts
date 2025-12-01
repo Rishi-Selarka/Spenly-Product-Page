@@ -142,28 +142,215 @@ function detectCategoryFallback(
   return expenseCategories.length > 0 ? expenseCategories[0].category_name : 'Uncategorized';
 }
 
+// AI-powered intent detection
+async function detectIntent(
+  message: string,
+  isLinked: boolean
+): Promise<'transaction' | 'greeting' | 'question' | 'link'> {
+  const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+  const openRouterModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
+
+  // Check for linking command first
+  if (message.toLowerCase().startsWith('link_')) {
+    return 'link';
+  }
+
+  if (!openRouterApiKey) {
+    // Fallback: simple heuristics
+    const lower = message.toLowerCase().trim();
+    if (lower === 'hi' || lower === 'hello' || lower === 'hey') return 'greeting';
+    if (lower.includes('?') || lower.startsWith('what') || lower.startsWith('how') || lower.startsWith('why')) return 'question';
+    // If it has numbers, likely a transaction
+    if (/\d/.test(message)) return 'transaction';
+    return 'question';
+  }
+
+  try {
+    const prompt = `Analyze this WhatsApp message and determine the user's intent. User is ${isLinked ? 'linked' : 'not linked'} to their account.
+
+Message: "${message}"
+
+Respond with ONLY one word: "transaction", "greeting", "question", or "link"
+
+Rules:
+- "transaction": User wants to add an expense/transaction (e.g., "pizza 10", "lunch $15", "coffee 5 dollars")
+- "greeting": Simple greetings (e.g., "hi", "hello", "hey")
+- "question": User is asking something (e.g., "how do I add a transaction?", "what can you do?")
+- "link": Message starts with "link_" (already handled, but include for completeness)
+
+Examples:
+- "pizza 10" → transaction
+- "hi" → greeting
+- "hello" → greeting
+- "how do I add expenses?" → question
+- "what can you do?" → question
+- "lunch $15" → transaction
+- "coffee 5" → transaction`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openRouterApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://www.spenly.app',
+        'X-Title': 'Spenly WhatsApp Bot'
+      },
+      body: JSON.stringify({
+        model: openRouterModel,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an intent classifier. Respond with only one word: transaction, greeting, question, or link.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 10
+      })
+    });
+
+    if (!response.ok) {
+      // Fallback to heuristics
+      const lower = message.toLowerCase().trim();
+      if (lower === 'hi' || lower === 'hello' || lower === 'hey') return 'greeting';
+      if (/\d/.test(message)) return 'transaction';
+      return 'question';
+    }
+
+    const data = await response.json();
+    const intent = data.choices?.[0]?.message?.content?.trim().toLowerCase();
+    
+    if (intent === 'transaction' || intent === 'greeting' || intent === 'question' || intent === 'link') {
+      return intent;
+    }
+
+    // Fallback
+    if (/\d/.test(message)) return 'transaction';
+    return 'question';
+  } catch (error) {
+    console.error('Error detecting intent:', error);
+    // Fallback
+    if (/\d/.test(message)) return 'transaction';
+    return 'question';
+  }
+}
+
+// AI-powered response generation for greetings and questions
+async function generateAIResponse(
+  message: string,
+  isLinked: boolean,
+  intent: 'greeting' | 'question'
+): Promise<string> {
+  const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+  const openRouterModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
+
+  if (!openRouterApiKey) {
+    // Fallback responses
+    if (intent === 'greeting') {
+      return isLinked
+        ? "👋 Hi! I'm Spenly AI. Send me your expenses like 'Pizza $15' or send a receipt photo!"
+        : "👋 Welcome to Spenly AI! Please link your account first. Go to Spenly app → Settings → Connect WhatsApp Bot.";
+    }
+    return "I'm Spenly AI, your expense tracking assistant. Send me transactions like 'Lunch $15' or ask me questions!";
+  }
+
+  try {
+    const context = isLinked
+      ? "The user is linked to their Spenly account. They can add transactions, view spending, and ask questions about their expenses."
+      : "The user is NOT linked yet. They need to link their account first via the Spenly app.";
+
+    const prompt = `You are Spenly AI, a friendly WhatsApp bot for expense tracking. ${context}
+
+User message: "${message}"
+Intent: ${intent}
+
+Generate a helpful, concise response (max 200 characters). Be friendly and natural. If user is not linked, remind them to link their account. If linked, explain how to add transactions.`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openRouterApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://www.spenly.app',
+        'X-Title': 'Spenly WhatsApp Bot'
+      },
+      body: JSON.stringify({
+        model: openRouterModel,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are Spenly AI, a friendly expense tracking assistant. Keep responses concise and helpful.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 150
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('AI response failed');
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices?.[0]?.message?.content?.trim();
+    
+    if (aiResponse) {
+      return aiResponse;
+    }
+  } catch (error) {
+    console.error('Error generating AI response:', error);
+  }
+
+  // Fallback
+  if (intent === 'greeting') {
+    return isLinked
+      ? "👋 Hi! Send me expenses like 'Pizza $15' or receipt photos!"
+      : "👋 Welcome! Link your account in Spenly app → Settings → Connect WhatsApp Bot.";
+  }
+  return "I'm Spenly AI! Send transactions like 'Lunch $15' or ask me questions about expenses.";
+}
+
 export async function handleWhatsAppMessage(
   from: string,
   body: string,
   mediaUrl?: string,
   messageType: string = 'text'
 ) {
-  // Check for linking command
-  if (body.toLowerCase().startsWith('link_')) {
+  // Check if user is linked
+  const appleUserId = await getAppleUserIdByWhatsApp(from);
+  const isLinked = !!appleUserId;
+
+  // Detect intent using AI
+  const intent = await detectIntent(body, isLinked);
+
+  // Handle linking
+  if (intent === 'link' || body.toLowerCase().startsWith('link_')) {
     const token = body.toLowerCase().replace('link_', '').trim();
     return handleLinkToken(from, token);
   }
 
-  // Check if user is linked
-  const appleUserId = await getAppleUserIdByWhatsApp(from);
-  if (!appleUserId) {
+  // Handle greetings and questions with AI
+  if (intent === 'greeting' || intent === 'question') {
+    const response = await generateAIResponse(body, isLinked, intent);
+    return sendWhatsAppMessage(from, response);
+  }
+
+  // If not linked and not a greeting/question, prompt to link
+  if (!isLinked) {
     return sendWhatsAppMessage(
       from,
       "Welcome to Spenly AI! To get started, please link your account. Go to Spenly app -> Settings -> Connect WhatsApp Bot to get your unique linking code."
     );
   }
 
-  // Handle transaction
+  // Handle transaction (intent === 'transaction' or images)
   return handleTransactionMessage(from, appleUserId, body, mediaUrl, messageType);
 }
 
