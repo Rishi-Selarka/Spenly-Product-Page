@@ -2,9 +2,32 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from '../../lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
-// Database migration: ensure currency columns exist
+// Database migration: create tables and ensure currency columns exist
 async function runMigrations() {
   try {
+    // Create link_tokens table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS link_tokens (
+        token VARCHAR(255) PRIMARY KEY,
+        apple_user_id VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used_at TIMESTAMP WITH TIME ZONE,
+        currency VARCHAR(10) DEFAULT 'USD'
+      )
+    `);
+
+    // Create users table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        apple_user_id VARCHAR(255) PRIMARY KEY,
+        whatsapp_number VARCHAR(255) UNIQUE,
+        linked_at TIMESTAMP WITH TIME ZONE,
+        currency VARCHAR(10) DEFAULT 'USD'
+      )
+    `);
+
+    // Add currency column if it doesn't exist (for existing tables)
     await db.query(`
       ALTER TABLE users 
       ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
@@ -16,6 +39,7 @@ async function runMigrations() {
     `);
   } catch (error) {
     console.error('Migration error:', error);
+    // Don't throw - migrations should be idempotent
   }
 }
 
@@ -53,9 +77,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
 
     return res.status(200).json({ token });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Link token error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack
+    });
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+    });
   }
 }
 
