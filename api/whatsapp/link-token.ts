@@ -1,144 +1,61 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { db } from '../../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Pool } from 'pg';
 
-// Inline database connection (avoids import path issues in Vercel)
-let pool: Pool | null = null;
-
-function getDB(): Pool {
-  if (!pool) {
-    const connectionString = process.env.POSTGRES_URL;
-    if (!connectionString) {
-      throw new Error('POSTGRES_URL environment variable is not set');
-    }
-    pool = new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      max: 5,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    });
-  }
-  return pool;
-}
-
-async function createSchema(): Promise<void> {
-  const db = getDB();
-  const client = await db.connect();
+// Database migration: ensure currency columns exist
+async function runMigrations() {
   try {
-    // Create tables
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS link_tokens (
-        token VARCHAR(255) PRIMARY KEY,
-        apple_user_id VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        used_at TIMESTAMP WITH TIME ZONE
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        apple_user_id VARCHAR(255) PRIMARY KEY,
-        whatsapp_number VARCHAR(255) UNIQUE,
-        linked_at TIMESTAMP WITH TIME ZONE
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS transactions (
-        id SERIAL PRIMARY KEY,
-        apple_user_id VARCHAR(255) NOT NULL,
-        amount NUMERIC(10, 2) NOT NULL,
-        transaction_date DATE NOT NULL,
-        vendor VARCHAR(255),
-        category VARCHAR(255),
-        note TEXT,
-        message_type VARCHAR(50) NOT NULL,
-        media_url TEXT,
-        status VARCHAR(50) DEFAULT 'pending_sync',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      )
+    await db.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
     `);
     
-    // Add currency columns if they don't exist (migration)
-    try {
-      await client.query(`
-        ALTER TABLE link_tokens 
-        ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
-      `);
-    } catch (e: any) {
-      if (!e.message.includes('already exists')) {
-        console.error('Error adding currency to link_tokens:', e);
-      }
-    }
-    
-    try {
-      await client.query(`
-        ALTER TABLE users 
-        ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
-      `);
-    } catch (e: any) {
-      if (!e.message.includes('already exists')) {
-        console.error('Error adding currency to users:', e);
-      }
-    }
-    
-    try {
-      await client.query(`
-        ALTER TABLE transactions 
-        ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
-      `);
-    } catch (e: any) {
-      if (!e.message.includes('already exists')) {
-        console.error('Error adding currency to transactions:', e);
-      }
-    }
-  } finally {
-    client.release();
+    await db.query(`
+      ALTER TABLE link_tokens 
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+    `);
+  } catch (error) {
+    console.error('Migration error:', error);
   }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
+  // Run migrations on every request
+  await runMigrations();
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    const { apple_user_id, currency } = req.body || {};
+  const { apple_user_id, currency } = req.body;
 
-    if (!apple_user_id) {
-      return res.status(400).json({ error: 'apple_user_id is required' });
-    }
-    
+  if (!apple_user_id) {
+    return res.status(400).json({ error: 'apple_user_id is required' });
+  }
+
+  try {
+    const token = uuidv4();
+    // Expires in 10 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const userCurrency = currency || 'USD';
 
-    await createSchema();
-    
-    const token = uuidv4();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-    const db = getDB();
     await db.query(
-      `INSERT INTO link_tokens (token, apple_user_id, currency, expires_at) VALUES ($1, $2, $3, $4)`,
-      [token, apple_user_id, userCurrency, expiresAt]
+      `INSERT INTO link_tokens (token, apple_user_id, expires_at, currency) VALUES ($1, $2, $3, $4)`,
+      [token, apple_user_id, expiresAt.toISOString(), userCurrency]
     );
 
-    return res.status(200).json({
-      token: token,
-      expires_at: expiresAt.toISOString()
-    });
-  } catch (error: any) {
-    console.error('Error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message
-    });
+    // Store currency in users table when linking (will be updated when token is used)
+    await db.query(
+      `INSERT INTO users (apple_user_id, currency) 
+       VALUES ($1, $2)
+       ON CONFLICT (apple_user_id) DO UPDATE SET currency = $2`,
+      [apple_user_id, userCurrency]
+    );
+
+    return res.status(200).json({ token });
+  } catch (error) {
+    console.error('Link token error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
+

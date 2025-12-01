@@ -1,112 +1,53 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Pool } from 'pg';
-
-// Inline database connection
-let pool: Pool | null = null;
-
-function getDB(): Pool {
-  if (!pool) {
-    const connectionString = process.env.POSTGRES_URL;
-    if (!connectionString) {
-      throw new Error('POSTGRES_URL environment variable is not set');
-    }
-    pool = new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      max: 5,
-    });
-  }
-  return pool;
-}
-
-async function ensureSchema(): Promise<void> {
-  const db = getDB();
-  try {
-    await db.query(`
-      ALTER TABLE transactions 
-      ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
-    `).catch(() => {});
-  } catch (error) {
-    console.log('Schema migration note:', error);
-  }
-}
+import { db } from '../../lib/db';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'GET') {
+    const { apple_user_id } = req.query;
+
+    if (!apple_user_id) {
+      return res.status(400).json({ error: 'apple_user_id is required' });
+    }
+
+    try {
+      const result = await db.query(
+        `SELECT * FROM transactions 
+         WHERE apple_user_id = $1 AND status = 'pending_sync'
+         ORDER BY created_at ASC`,
+        [apple_user_id]
+      );
+
+      return res.status(200).json(result.rows);
+    } catch (error) {
+      console.error('Get transactions error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  } 
   
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  else if (req.method === 'POST') {
+    const { transaction_ids } = req.body;
 
-  try {
-    await ensureSchema();
-    const db = getDB();
+    if (!transaction_ids || !Array.isArray(transaction_ids)) {
+      return res.status(400).json({ error: 'transaction_ids array required' });
+    }
 
-    if (req.method === 'GET') {
-      const apple_user_id = req.query.apple_user_id as string;
-      
-      if (!apple_user_id) {
-        return res.status(400).json({ error: 'apple_user_id is required' });
-      }
+    if (transaction_ids.length === 0) {
+      return res.status(200).json({ message: 'No transactions to confirm' });
+    }
 
-      try {
-        const result = await db.query(
-          `SELECT id, apple_user_id, amount, currency, transaction_date, vendor, category, note, message_type, media_url, status, created_at
-           FROM transactions
-           WHERE apple_user_id = $1 AND status = 'pending_sync'
-           ORDER BY created_at ASC`,
-          [apple_user_id]
-        );
-        
-        // Convert NUMERIC to number (PostgreSQL returns NUMERIC as string)
-        const transactions = result.rows.map(row => ({
-          id: row.id,
-          apple_user_id: row.apple_user_id,
-          amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount, // Convert string to number
-          currency: row.currency || 'USD',
-          date: row.transaction_date ? new Date(row.transaction_date).toISOString().split('T')[0] : null,
-          vendor: row.vendor,
-          category: row.category,
-          note: row.note,
-          message_type: row.message_type,
-          media_url: row.media_url,
-          status: row.status,
-          created_at: row.created_at
-        }));
-
-        return res.status(200).json(transactions);
-      } catch (e: any) {
-        if (e.code === '42P01') {
-          return res.status(200).json([]);
-        }
-        throw e;
-      }
-    } 
-    
-    else if (req.method === 'POST') {
-      const { transaction_ids } = req.body || {};
-
-      if (!transaction_ids || !Array.isArray(transaction_ids) || transaction_ids.length === 0) {
-        return res.status(400).json({ error: 'transaction_ids array is required' });
-      }
-
+    try {
       await db.query(
         `UPDATE transactions SET status = 'synced' WHERE id = ANY($1::int[])`,
         [transaction_ids]
       );
-      
-      return res.status(200).json({ message: 'Transactions synced successfully' });
-    }
 
-    return res.status(405).json({ error: 'Method not allowed' });
-    
-  } catch (error: any) {
-    console.error('Error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message
-    });
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Confirm transactions error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }
+
