@@ -195,6 +195,14 @@ const TechnicalDocumentation: React.FC = () => {
           </p>
           <p>Key design decisions: <strong>local-first</strong> data, <strong>offline support</strong> via a price cache, and <strong>anonymous monetization</strong> via RevenueCat (no sign-up required).</p>
 
+          <h3>Data layer: SwiftData schema</h3>
+          <p>
+            We use three SwiftData models. <strong>Asset</strong> is the core: a unified model for stocks, crypto, gold, bonds, real estate, and cash. Each asset type has different fields—stocks use <code>quantity</code> and <code>tickerSymbol</code>; gold uses <code>weight</code> and <code>weightUnit</code>; bonds use <code>maturityDate</code> and <code>interestRate</code>. Storing them in one model simplifies queries and charts. Enums like <code>AssetType</code> and <code>AssetClass</code> are persisted as raw strings for SwiftData compatibility.
+          </p>
+          <p>
+            <strong>PriceCache</strong> stores symbol → price → lastUpdated for market-linked assets. When the app is offline or an API fails, we read from this cache so portfolio values still display. <strong>Goal</strong> tracks savings targets and deadlines.
+          </p>
+
           <h2>RevenueCat Implementation</h2>
           <p>
             Future uses <a href="https://docs.revenuecat.com/docs" target="_blank" rel="noopener noreferrer">RevenueCat</a> for subscription management. The integration follows their recommended patterns for configuration, entitlement checks, and purchase flows.
@@ -256,11 +264,19 @@ final class RevenueCatManager {
 
           <p><strong>Documentation:</strong> <a href="https://docs.revenuecat.com/docs/getting-started/configuring-sdk" target="_blank" rel="noopener noreferrer">Configuring the SDK</a> · <a href="https://docs.revenuecat.com/docs/tools/paywalls" target="_blank" rel="noopener noreferrer">Paywalls</a></p>
 
+          <h3>3. Paywall gating and premium features</h3>
+          <p>
+            Premium features (Future Score, risk flags, AI chatbot, PDF export) are gated by <code>revenueCat.isPremium</code>. When a user taps Insights or ChatBot without a subscription, we present a native SwiftUI paywall sheet. The paywall shows feature benefits, package options (monthly vs annual), and a restore purchases link. All state updates run on the MainActor so the UI reflects subscription status immediately after purchase.
+          </p>
+
           <Divider />
 
           <h2>Multi-API price service</h2>
           <p>
-            Market prices are fetched from multiple providers with a fallback chain to improve reliability. Stocks: Twelve Data → Finnhub → Alpha Vantage. Crypto: Binance public API. Gold/silver: GoldAPI. FX: ExchangeRate-API.
+            Different financial APIs have different coverage and rate limits. Twelve Data handles international stocks; Finnhub focuses on US markets; Alpha Vantage has stricter limits. Instead of depending on one provider, we use a <strong>fallback chain</strong>: try the primary API, then the next, then the last. That keeps the app working even when one provider is rate-limited or down.
+          </p>
+          <p>
+            We also <strong>deduplicate requests</strong> during batch refresh: if five assets use AAPL, we fetch AAPL once and apply the price to all of them. For gold and silver, we fetch spot prices per currency (USD, INR, etc.) and convert from troy ounce to grams so users can enter weight in their preferred unit.
           </p>
           <h3>Stock price fallback logic</h3>
           <CodeBlock>
@@ -276,11 +292,21 @@ final class RevenueCatManager {
     }
 }`}</code>
           </CodeBlock>
-          <p>Results are cached in SwiftData for offline use.</p>
+          <p>
+            Results are written to the <code>PriceCache</code> SwiftData model after each successful fetch. On the next app launch or refresh, we first try the API; on failure we read from cache and show a "last updated" timestamp so users know the data may be stale.
+          </p>
 
           <h2>Future Score algorithm</h2>
           <p>
-            Premium insights include a <strong>Future Score</strong> (0–100) computed from three components: Diversification (0–35), Asset Balance (0–35), and Country Spread (0–30). The algorithm uses deterministic rules and concentration penalties for transparency.
+            Premium insights include a <strong>Future Score</strong> (0–100) that measures portfolio health. We chose deterministic rules over black-box ML so users can understand why their score changes. The score has three parts:
+          </p>
+          <ul>
+            <li><strong>Diversification (0–35):</strong> Rewards having multiple asset classes (equity, commodity, fixed income, alternative, cash). Applies a concentration penalty: if any single asset is &gt;30% of the portfolio, the score drops. Above 50% concentration we cap the diversification component to zero.</li>
+            <li><strong>Asset Balance (0–35):</strong> Starts at 35 and deducts for common issues: equity overweight (&gt;60%), no fixed income, no cash buffer, no alternatives, or any single class dominating (&gt;80%).</li>
+            <li><strong>Country Spread (0–30):</strong> Rewards geographic diversification. More countries = higher score. We also penalize single-country concentration above 50%.</li>
+          </ul>
+          <p>
+            The total is <code>min(diversification + assetBalance + countrySpread, 100)</code>. We surface the sub-scores in the UI so users can see exactly which area to improve.
           </p>
           <CodeBlock>
             <code>{`func computeFutureScore() -> FutureScore {
@@ -295,6 +321,24 @@ final class RevenueCatManager {
                       assetBalance: assetBalance, countrySpread: countrySpread)
 }`}</code>
           </CodeBlock>
+
+          <h2>Risk flags and suggestions</h2>
+          <p>
+            Beyond the Future Score, we generate <strong>risk flags</strong> and <strong>suggestions</strong> from the same portfolio data. Flags are rule-based: we check equity percentage, country concentration, presence of fixed income and cash, and single-asset concentration. Each flag has a severity (high/medium/low) and a plain-language description. Suggestions are contextual—e.g. "Consider geographic diversification" if the user has investments in only one or two countries, or "Add fixed income" if the allocation is below 15%.
+          </p>
+          <p>
+            Both run synchronously on the main portfolio snapshot. No external APIs are called—everything is computed locally from the assets already in SwiftData. That keeps the Insights tab fast and usable offline.
+          </p>
+
+          <h2>AI chatbot and portfolio context</h2>
+          <p>
+            The premium AI chatbot uses <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer">OpenRouter</a> with a model that receives a <strong>system prompt</strong> containing the user's full portfolio: asset names, types, values, gain/loss, country exposure, and goals. The model is instructed to answer only investment-related questions and to reference the user's actual holdings. We stream the response using Server-Sent Events (SSE) so text appears progressively instead of waiting for the full reply. Markdown is stripped before display since we use plain SwiftUI Text.
+          </p>
+
+          <h2>Async and threading</h2>
+          <p>
+            Network calls (price fetches, RevenueCat, AI chat) run in async tasks. SwiftUI views update on the main thread, so we use <code>await MainActor.run { ... }</code> whenever we mutate observable state from a background task. That prevents UI flicker and ensures subscription status, loading indicators, and error messages update correctly. The paywall and premium-gated views react to <code>revenueCat.isPremium</code> via SwiftUI's observation system, so they re-render automatically when a purchase completes.
+          </p>
 
           <Divider />
 
