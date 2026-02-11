@@ -337,7 +337,7 @@ final class RevenueCatManager {
 
           <h2>Async and threading</h2>
           <p>
-            Network calls (price fetches, RevenueCat, AI chat) run in async tasks. SwiftUI views update on the main thread, so we use <code>await MainActor.run { ... }</code> whenever we mutate observable state from a background task. That prevents UI flicker and ensures subscription status, loading indicators, and error messages update correctly. The paywall and premium-gated views react to <code>revenueCat.isPremium</code> via SwiftUI's observation system, so they re-render automatically when a purchase completes.
+            Network calls (price fetches, RevenueCat, AI chat) run in async tasks. SwiftUI views update on the main thread, so we use <code>await MainActor.run &#123; ... &#125;</code> whenever we mutate observable state from a background task. That prevents UI flicker and ensures subscription status, loading indicators, and error messages update correctly. The paywall and premium-gated views react to <code>revenueCat.isPremium</code> via SwiftUI's observation system, so they re-render automatically when a purchase completes.
           </p>
 
           <Divider />
