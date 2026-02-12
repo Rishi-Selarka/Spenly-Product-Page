@@ -161,7 +161,7 @@ const TechnicalDocumentation: React.FC = () => {
         <BackLink to="/">← Back to Home</BackLink>
         <Content>
           <h1>Technical Documentation</h1>
-          <p className="subtitle">Future: Investment Portfolio Manager — Architecture, Tech Stack & RevenueCat Implementation</p>
+          <p className="subtitle">Future: Investment Portfolio Manager. Architecture, Tech Stack & RevenueCat Implementation</p>
 
           <p>
             Future is an iOS investment portfolio tracker built for investors who want to consolidate fragmented holdings (stocks, crypto, gold, bonds, real estate, cash) into one app with live prices, risk analysis, and premium insights.
@@ -191,13 +191,13 @@ const TechnicalDocumentation: React.FC = () => {
 
           <h2>Architecture Overview</h2>
           <p>
-            The app uses a <strong>SwiftUI + Services</strong> architecture with environment-injected managers and <code>@Observable</code> state. Portfolio data is stored locally with SwiftData. No backend or cloud sync—everything stays on device for privacy.
+            The app uses a <strong>SwiftUI + Services</strong> architecture with environment-injected managers and <code>@Observable</code> state. Portfolio data is stored locally with SwiftData. No backend or cloud sync; everything stays on device for privacy.
           </p>
           <p>Key design decisions: <strong>local-first</strong> data, <strong>offline support</strong> via a price cache, and <strong>anonymous monetization</strong> via RevenueCat (no sign-up required).</p>
 
           <h3>Data layer: SwiftData schema</h3>
           <p>
-            We use three SwiftData models. <strong>Asset</strong> is the core: a unified model for stocks, crypto, gold, bonds, real estate, and cash. Each asset type has different fields—stocks use <code>quantity</code> and <code>tickerSymbol</code>; gold uses <code>weight</code> and <code>weightUnit</code>; bonds use <code>maturityDate</code> and <code>interestRate</code>. Storing them in one model simplifies queries and charts. Enums like <code>AssetType</code> and <code>AssetClass</code> are persisted as raw strings for SwiftData compatibility.
+            We use three SwiftData models. <strong>Asset</strong> is the core: a unified model for stocks, crypto, gold, bonds, real estate, and cash. Each asset type has different fields: stocks use <code>quantity</code> and <code>tickerSymbol</code>; gold uses <code>weight</code> and <code>weightUnit</code>; bonds use <code>maturityDate</code> and <code>interestRate</code>. Storing them in one model simplifies queries and charts. Enums like <code>AssetType</code> and <code>AssetClass</code> are persisted as raw strings for SwiftData compatibility.
           </p>
           <p>
             <strong>PriceCache</strong> stores symbol → price → lastUpdated for market-linked assets. When the app is offline or an API fails, we read from this cache so portfolio values still display. <strong>Goal</strong> tracks savings targets and deadlines.
@@ -324,10 +324,10 @@ final class RevenueCatManager {
 
           <h2>Risk flags and suggestions</h2>
           <p>
-            Beyond the Future Score, we generate <strong>risk flags</strong> and <strong>suggestions</strong> from the same portfolio data. Flags are rule-based: we check equity percentage, country concentration, presence of fixed income and cash, and single-asset concentration. Each flag has a severity (high/medium/low) and a plain-language description. Suggestions are contextual—e.g. "Consider geographic diversification" if the user has investments in only one or two countries, or "Add fixed income" if the allocation is below 15%.
+            Beyond the Future Score, we generate <strong>risk flags</strong> and <strong>suggestions</strong> from the same portfolio data. Flags are rule-based: we check equity percentage, country concentration, presence of fixed income and cash, and single-asset concentration. Each flag has a severity (high/medium/low) and a plain-language description. Suggestions are contextual, e.g. "Consider geographic diversification" if the user has investments in only one or two countries, or "Add fixed income" if the allocation is below 15%.
           </p>
           <p>
-            Both run synchronously on the main portfolio snapshot. No external APIs are called—everything is computed locally from the assets already in SwiftData. That keeps the Insights tab fast and usable offline.
+            Both run synchronously on the main portfolio snapshot. No external APIs are called; everything is computed locally from the assets already in SwiftData. That keeps the Insights tab fast and usable offline.
           </p>
 
           <h2>AI chatbot and portfolio context</h2>
@@ -350,7 +350,7 @@ final class RevenueCatManager {
           </ul>
 
           <p style={{ marginTop: 32, opacity: 0.8 }}>
-            Future — Your present investments decide your future.
+            Future. Your present investments decide your future.
           </p>
         </Content>
       </ContentWrapper>

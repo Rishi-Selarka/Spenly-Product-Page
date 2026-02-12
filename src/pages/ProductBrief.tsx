@@ -104,43 +104,46 @@ const ProductBrief: React.FC = () => {
         <BackLink to="/">← Back to Home</BackLink>
         <Content>
           <h1>Product Brief</h1>
-          <p className="subtitle">Future: Investment Portfolio Manager — Problem, Audience & Monetization</p>
+          <p className="subtitle">Future: Investment Portfolio Manager. Problem, Audience & Monetization</p>
 
           <h2>The Problem</h2>
           <p>
-            Investors today hold fragmented portfolios across many platforms: stocks in a brokerage app, gold in a separate tracker, bonds in spreadsheets, real estate and cash elsewhere. Getting a true picture of allocation, risk, and performance means switching between apps and manual aggregation. There is no single place to log everything, see live updates where possible, set maturity alerts for illiquid assets, or understand portfolio health at a glance.
+            If you invest in more than one place, you know the frustration. Stocks in one app, gold in another, bonds scribbled in a spreadsheet, real estate and cash somewhere else. To understand your real allocation or how you&apos;re actually doing, you hop between screens, copy numbers, and hope nothing&apos;s outdated. There&apos;s no single place that says: here&apos;s everything you own, here&apos;s what it&apos;s worth right now, and here&apos;s whether your portfolio is healthy or taking on too much risk.
           </p>
           <p>
-            Josh @VisualPolitik articulated this clearly: investors juggle stocks, gold, funds, fixed income, and real estate across multiple platforms—messy to track and hard to understand. Future solves this by consolidating all holdings into one app, with real-time prices for market-linked assets, manual entry for the rest, and premium risk and diversification analysis to make sense of it all.
+            Josh @VisualPolitik put it simply: investors juggle stocks, gold, funds, fixed income, and real estate across multiple platforms, messy to track and hard to understand. We built Future because we wanted that problem gone. One app where you log everything, get live prices where the market provides them, set alerts for maturity dates and lock-ins, and finally see your portfolio as a whole, with clear, actionable insights instead of guesswork.
           </p>
 
           <h2>Target Audience</h2>
           <p>
-            Future is built for <strong>serious retail investors</strong> who care about their financial future and want clarity without complexity. Specifically:
+            Future is for people who take their money seriously. Not day traders. People building wealth over time, across asset classes, who want clarity without jargon. We think about three kinds of users:
           </p>
           <ul>
-            <li><strong>Multi-asset holders</strong> — People who invest in stocks, crypto, gold, bonds, real estate, or cash. They need one portfolio view, not five disconnected apps.</li>
-            <li><strong>Josh @VisualPolitik&apos;s community</strong> — Viewers who follow news, economics, and personal finance and are actively building wealth across asset classes.</li>
-            <li><strong>Privacy-conscious users</strong> — Those who prefer local data storage over cloud sync and want full control of their financial information.</li>
-            <li><strong>Goal-oriented savers</strong> — Users who set targets (house down payment, emergency fund, etc.) and want to track progress alongside their portfolio.</li>
+            <li><strong>Multi-asset investors</strong>. You hold stocks, maybe some crypto, gold or silver, bonds or fixed deposits, perhaps a property or two. You don&apos;t want five different apps. You want one view that shows it all.</li>
+            <li><strong>Josh&apos;s community</strong>. Viewers who care about economics, personal finance, and long-term wealth. They&apos;re already diversified; they just need a tool that matches how they think.</li>
+            <li><strong>Privacy-minded users</strong>. People who prefer their financial data to stay on their device. No cloud sync, no broker links. You add your numbers, and Future helps you understand them, without ever sending your portfolio to a server.</li>
+            <li><strong>Goal-driven savers</strong>. Anyone with targets: a house down payment, an emergency fund, a retirement number. Future lets you track those goals alongside your investments so you see progress in one place.</li>
           </ul>
           <p>
-            The app assumes no sign-up: anonymous users can track investments, see charts, and use the free dashboard. Premium features unlock for subscribers who want deeper insights.
+            We don&apos;t ask for sign-up. You can track investments, see charts, and use the free dashboard as an anonymous user. Premium unlocks when you want deeper analysis: risk flags, Future Score, AI help, and PDF exports.
           </p>
 
           <h2>Monetization Strategy</h2>
           <p>
-            Future uses a <strong>freemium subscription model</strong> powered by RevenueCat. The free tier includes dashboard, charts, asset list, timeline alerts, and basic tracking. Premium (Future Pro) adds Future Score, risk flags, personalized suggestions, AI chatbot, PDF export, and premium themes.
+            Future uses a <strong>freemium model</strong> powered by RevenueCat. The free tier gives you the dashboard, charts, asset list, timeline alerts, and basic tracking, enough to see your portfolio and keep it updated. Future Pro adds what serious investors actually want: a 0–100 Future Score, risk flags that spell out concentration and diversification issues, personalized suggestions, an AI chatbot that knows your holdings, PDF exports for records or advisors, and premium themes.
           </p>
           <p>
-            <strong>Why it converts:</strong> The value is clear. Users see locked insights and understand what they&apos;re missing: actionable risk analysis, a 0–100 portfolio health score, and AI assistance grounded in their actual holdings. The paywall explains these benefits up front. We offer monthly and annual plans, with the annual plan positioned as best value. Restore purchases is always visible for users who already subscribe on another device.
+            <strong>Pricing:</strong> Monthly is $2.99; yearly is $24.99 (about two months free). We kept it low on purpose. Portfolio analysis shouldn&apos;t cost a fortune. At under three dollars a month, it&apos;s an easy yes for anyone who&apos;s already putting real money to work.
           </p>
           <p>
-            <strong>Sustainability:</strong> A $4.99/month or equivalent annual subscription is aligned with the value of professional-grade portfolio analysis. Serious investors pay for tools that help them make better decisions. Future delivers that without requiring a broker connection or sharing sensitive data—everything stays on device. The model is designed for long-term retention: the more assets users add, the more useful Future becomes, and the harder it is to leave.
+            <strong>Why it converts:</strong> Users see locked insights and immediately get it: they&apos;re missing clarity on risk, a health score for their portfolio, and AI help grounded in their actual data. The paywall explains this up front. We highlight the annual plan as best value, and Restore Purchases is always visible for people who already subscribed elsewhere.
+          </p>
+          <p>
+            <strong>Long-term thinking:</strong> The more you use Future, the more valuable it becomes. Add more assets, and the analytics get smarter. Set goals, and the timeline keeps you on track. We&apos;re not chasing quick upgrades; we want people to stay because the app earns its place. Everything runs locally, so there&apos;s no fear of data leaks or broker connections, just a straightforward tool that helps you understand where you stand.
           </p>
 
           <p style={{ marginTop: 48, opacity: 0.85 }}>
-            Future — Your present investments decide your future.
+            Future. Your present investments decide your future.
           </p>
         </Content>
       </ContentWrapper>
